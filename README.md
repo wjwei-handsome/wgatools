@@ -1,0 +1,1 @@
+## *W*hole *G*enome *A*lignment **T**ools
