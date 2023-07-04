@@ -1,7 +1,4 @@
-use nom::IResult;
-use wgalib::errors::{FileFormat, ParseError};
-use wgalib::parser::{PafReader, parse_cigar_to_alignment};
-
+use wgalib::parser::parse_cigar_to_alignment;
 
 fn main() {
     // match PafReader::from_path("data/test.paf") {

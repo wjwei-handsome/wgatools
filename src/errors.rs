@@ -71,21 +71,21 @@ impl fmt::Display for ParseError {
                     "IO error: {}, check path: {}",
                     self.msg, self.file_info.name
                 )
-            },
+            }
             ParseErrorKind::Empty => {
                 write!(
                     f,
                     "Empty input: {}, check path: {}",
                     self.msg, self.file_info.name
                 )
-            },
+            }
             _ => {
                 write!(
                     f,
                     "Parse error: {}, check path: {}",
                     self.msg, self.file_info.name
                 )
-            },
+            }
         }
     }
 }

@@ -1,16 +1,14 @@
-use std::io;
-use std::fs::File;
-use std::str;
 use csv::{DeserializeRecordsIter, ReaderBuilder};
-use nom::bytes::complete::{tag, take_till, take_while};
+use nom::bytes::complete::{tag, take_while};
 use nom::character::{is_alphabetic, is_digit};
-use nom::{AsBytes, IResult, Parser};
-use nom::character::complete::u64;
-use nom::error::Error;
-use nom::multi::{fold_many0, many0};
-use serde::{Serialize, Deserialize};
-use crate::errors::{FileFormat, ParseError};
+use nom::IResult;
+use std::fs::File;
+use std::io;
+use std::str;
 
+use nom::error::Error;
+use nom::multi::fold_many0;
+use serde::{Deserialize, Serialize};
 
 /// Parser for PAF format files
 pub struct PafReader<R: io::Read> {
@@ -18,7 +16,8 @@ pub struct PafReader<R: io::Read> {
 }
 
 impl<R> PafReader<R>
-where R: io::Read
+where
+    R: io::Read,
 {
     /// Create a new PAF parser
     pub fn new(reader: R) -> Self {
@@ -34,7 +33,7 @@ where R: io::Read
     /// Iterate over the records in the PAF file
     pub fn records(&mut self) -> Records<'_, R> {
         Records {
-            inner: self.inner.deserialize()
+            inner: self.inner.deserialize(),
         }
     }
 }
@@ -46,10 +45,9 @@ impl PafReader<File> {
     }
 }
 
-
 /// An iterator struct for PAF records
 pub struct Records<'a, R: io::Read> {
-    inner: DeserializeRecordsIter<'a, R, PafRecord>
+    inner: DeserializeRecordsIter<'a, R, PafRecord>,
 }
 
 impl<'a, R: io::Read> Iterator for Records<'a, R> {
@@ -79,9 +77,12 @@ pub struct PafRecord {
     pub tags: Vec<String>,
 }
 
-fn parse_cigar(input: &[u8]) ->IResult<&[u8], (&[u8], &[u8])> {
-    if input.len() == 0 {
-        return Err(nom::Err::Error(Error::new(input, nom::error::ErrorKind::Eof)));
+fn parse_cigar(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
+    if input.is_empty() {
+        return Err(nom::Err::Error(Error::new(
+            input,
+            nom::error::ErrorKind::Eof,
+        )));
     }
     println!("{:?}", input);
     let (input, len) = take_while(is_digit)(input)?;
@@ -92,8 +93,9 @@ fn parse_cigar(input: &[u8]) ->IResult<&[u8], (&[u8], &[u8])> {
 }
 
 /// "cg:Z:5M1D2I10M" => [("M", 5), ("D", 1), ("I", 2), ("M", 10)]
+#[allow(clippy::type_complexity)]
 pub fn parse_cigar_to_alignment(cigar: &[u8]) -> IResult<&[u8], Vec<(&[u8], &[u8])>> {
-    let (cigar, tag) = tag(b"cg:Z:")(cigar)?;
+    let (cigar, _tag) = tag(b"cg:Z:")(cigar)?;
     // let mut res_vec = Vec::new();
     let mut qpos = 10u64;
     let mut tpos = 20u64;
