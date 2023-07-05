@@ -14,6 +14,7 @@ pub enum FileFormat {
     Chain,
     Bedpe,
     Unknown,
+    Blocks,
 }
 
 /// Represents what a file and it's format when error occurs

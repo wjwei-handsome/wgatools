@@ -1,22 +1,22 @@
-use wgalib::parser::parse_cigar_to_alignment;
+use wgalib::errors::FileFormat;
+use wgalib::parser::paf::PafReader;
 
 fn main() {
-    // match PafReader::from_path("data/test.paf") {
-    //     Ok(mut reader) => {
-    //         for record in reader.records() {
-    //             let record = record?;
-    //             println!("{:?}", record);
-    //         }
-    //         // Ok(())
+    let mut reader = PafReader::from_path("/Users/wjwei/Zm-CML333.paf").unwrap();
+    // for record in reader.records() {
+    //     // let record = record.unwrap();
+    //     println!("{:?}", record);
+    // }
+    reader.convert("test.chain", FileFormat::Chain);
+    let mut reader = PafReader::from_path("/Users/wjwei/Zm-CML333.paf").unwrap();
+    reader.convert("tes.blocks", FileFormat::Blocks);
+    // match parse_cigar_to_alignment("cg:Z:20M5D15M".as_bytes()) {
+    //     Ok((_, alignment)) => {
+    //         println!("{:?}", alignment);
     //     }
-    //     Err(e) => Err(e.into()),
-    // };
-    match parse_cigar_to_alignment("cg:Z:20M5D15M".as_bytes()) {
-        Ok((_, alignment)) => {
-            println!("{:?}", alignment);
-        }
-        Err(e) => {
-            println!("{:?}", e);
-        }
-    }
+    //     Err(e) => {
+    //         println!("{:?}", e);
+    //     }
+    // }
+    // paf2chain();
 }
