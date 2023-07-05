@@ -1,14 +1,12 @@
+use crate::converter::paf2block::paf2blocks;
+use crate::converter::paf2chain::paf2chains;
+use crate::errors::FileFormat;
+use crate::parser::common::{AlignRecord, Strand};
 use csv::{DeserializeRecordsIter, ReaderBuilder};
-use nom::bytes::complete::{tag, take_while};
-use nom::character::{is_alphabetic, is_digit};
-use nom::IResult;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io;
 use std::str;
-
-use nom::error::Error;
-use nom::multi::fold_many0;
-use serde::{Deserialize, Serialize};
 
 /// Parser for PAF format files
 pub struct PafReader<R: io::Read> {
@@ -36,6 +34,15 @@ where
             inner: self.inner.deserialize(),
         }
     }
+
+    /// convert method
+    pub fn convert(&mut self, outputpath: &str, format: FileFormat) {
+        match format {
+            FileFormat::Chain => paf2chains(self, outputpath),
+            FileFormat::Blocks => paf2blocks(self, outputpath),
+            _ => {}
+        }
+    }
 }
 
 impl PafReader<File> {
@@ -45,20 +52,7 @@ impl PafReader<File> {
     }
 }
 
-/// An iterator struct for PAF records
-pub struct Records<'a, R: io::Read> {
-    inner: DeserializeRecordsIter<'a, R, PafRecord>,
-}
-
-impl<'a, R: io::Read> Iterator for Records<'a, R> {
-    type Item = csv::Result<PafRecord>;
-
-    fn next(&mut self) -> Option<csv::Result<PafRecord>> {
-        self.inner.next()
-    }
-}
-
-#[derive(Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 /// A PAF record refer to https://github.com/lh3/miniasm/blob/master/PAF.md
 pub struct PafRecord {
     pub query_name: String,
@@ -77,54 +71,70 @@ pub struct PafRecord {
     pub tags: Vec<String>,
 }
 
-fn parse_cigar(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
-    if input.is_empty() {
-        return Err(nom::Err::Error(Error::new(
-            input,
-            nom::error::ErrorKind::Eof,
-        )));
-    }
-    println!("{:?}", input);
-    let (input, len) = take_while(is_digit)(input)?;
-    println!("{:?}", input);
-    let (input, op) = take_while(is_alphabetic)(input)?;
-    println!("{:?}", input);
-    Ok((input, (op, len)))
+/// An iterator struct for PAF records
+pub struct Records<'a, R: io::Read> {
+    inner: DeserializeRecordsIter<'a, R, PafRecord>,
 }
 
-/// "cg:Z:5M1D2I10M" => [("M", 5), ("D", 1), ("I", 2), ("M", 10)]
-#[allow(clippy::type_complexity)]
-pub fn parse_cigar_to_alignment(cigar: &[u8]) -> IResult<&[u8], Vec<(&[u8], &[u8])>> {
-    let (cigar, _tag) = tag(b"cg:Z:")(cigar)?;
-    // let mut res_vec = Vec::new();
-    let mut qpos = 10u64;
-    let mut tpos = 20u64;
-    let (rest, res) = fold_many0(
-        parse_cigar,
-        Vec::new,
-        |mut acc: Vec<(&[u8], &[u8])>, item| {
-            println!("{:?}", item);
-            acc.push(item);
-            let count = item.1;
-            let op = item.0;
-            let count_u64 = str::from_utf8(count).unwrap().parse::<u64>().unwrap();
-            println!("count: {}", count_u64);
-            match op {
-                b"M" => {
-                    qpos += count_u64;
-                    tpos += count_u64;
-                }
-                b"I" => {
-                    qpos += count_u64;
-                }
-                b"D" => {
-                    tpos += count_u64;
-                }
-                _ => {}
-            };
-            println!("qpos: {}, tpos: {}", qpos, tpos);
-            acc
-        },
-    )(cigar)?;
-    Ok((rest, res))
+/// impl Iterator for Records
+impl<'a, R: io::Read> Iterator for Records<'a, R> {
+    type Item = csv::Result<PafRecord>;
+    fn next(&mut self) -> Option<csv::Result<PafRecord>> {
+        self.inner.next()
+    }
+}
+
+/// impl AlignRecord Trait for PafRecord
+impl AlignRecord for PafRecord {
+    fn query_name(&self) -> &str {
+        &self.query_name
+    }
+
+    fn query_length(&self) -> u64 {
+        self.query_length
+    }
+
+    fn query_start(&self) -> u64 {
+        self.query_start
+    }
+
+    fn query_end(&self) -> u64 {
+        self.query_end
+    }
+
+    fn query_strand(&self) -> Strand {
+        match self.strand {
+            '+' => Strand::Positive,
+            '-' => Strand::Negative,
+            _ => panic!("Invalid strand"),
+        }
+    }
+
+    fn target_name(&self) -> &str {
+        &self.target_name
+    }
+
+    fn target_length(&self) -> u64 {
+        self.target_length
+    }
+
+    fn target_start(&self) -> u64 {
+        self.target_start
+    }
+
+    fn target_end(&self) -> u64 {
+        self.target_end
+    }
+
+    fn target_strand(&self) -> Strand {
+        Strand::Positive
+    }
+
+    fn get_cigar_bytes(&self) -> &[u8] {
+        self.tags
+            .iter()
+            .find(|x| x.starts_with("cg:Z:"))
+            .unwrap() // TODO: handle a err
+            .as_bytes()
+    }
 }
