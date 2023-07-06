@@ -1,6 +1,20 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+/// Enum the file types
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum FileFormat {
+    Maf,
+    Sam,
+    Bam,
+    Paf,
+    Delta,
+    Chain,
+    Bedpe,
+    Unknown,
+    Blocks,
+}
+
 /// Represented in:
 /// - PAF 1-9 columns
 /// - CHAIN header lines

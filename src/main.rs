@@ -1,4 +1,4 @@
-use wgalib::errors::FileFormat;
+use wgalib::parser::common::FileFormat;
 use wgalib::parser::paf::PafReader;
 
 fn main() {

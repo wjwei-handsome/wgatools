@@ -1,7 +1,6 @@
 use crate::converter::paf2block::paf2blocks;
 use crate::converter::paf2chain::paf2chains;
-use crate::errors::FileFormat;
-use crate::parser::common::{AlignRecord, Strand};
+use crate::parser::common::{AlignRecord, FileFormat, Strand};
 use csv::{DeserializeRecordsIter, ReaderBuilder};
 use serde::{Deserialize, Serialize};
 use std::fs::File;

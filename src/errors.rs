@@ -1,21 +1,8 @@
 //! The error kinds when process whole genome alignments(wga)
 
+use crate::parser::common::FileFormat;
 use std::fmt::Formatter;
 use std::{fmt, io};
-
-/// Enum the file types
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum FileFormat {
-    Maf,
-    Sam,
-    Bam,
-    Paf,
-    Delta,
-    Chain,
-    Bedpe,
-    Unknown,
-    Blocks,
-}
 
 /// Represents what a file and it's format when error occurs
 #[derive(Debug, PartialEq, Clone)]

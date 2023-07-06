@@ -1,6 +1,6 @@
 pub(crate) mod chain;
 pub(crate) mod cigar;
-pub(crate) mod common;
+pub mod common;
 pub mod paf;
 
 // pub use chain::ChainDataLine;
