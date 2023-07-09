@@ -1,12 +1,12 @@
 use crate::parser::chain::Header;
 use crate::parser::cigar::parse_cigar_to_chain;
-use crate::parser::paf::PafReader;
+use crate::parser::paf::PAFReader;
 use crate::utils::output_writer;
 use std::io;
 use std::io::Write;
 
 /// Convert a PAF Reader to output a Chain file
-pub fn paf2chains<R: io::Read>(pafreader: &mut PafReader<R>, outputpath: &str) {
+pub fn paf2chains<R: io::Read>(pafreader: &mut PAFReader<R>, outputpath: &str) {
     // init writer
     let mut writer = output_writer(outputpath);
 

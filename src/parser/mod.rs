@@ -2,6 +2,7 @@ pub(crate) mod chain;
 pub(crate) mod cigar;
 pub mod common;
 pub mod paf;
+pub mod maf;
 
 // pub use chain::ChainDataLine;
 // pub use chain::Header;

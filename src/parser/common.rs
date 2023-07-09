@@ -36,6 +36,16 @@ pub enum Strand {
     Negative,
 }
 
+impl From<char> for Strand {
+    fn from(c: char) -> Self {
+        match c {
+            '+' => Strand::Positive,
+            '-' => Strand::Negative,
+            _ => panic!("Invalid strand character"), // TODO: better error handling
+        }
+    }
+}
+
 impl fmt::Display for Strand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {

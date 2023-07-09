@@ -8,17 +8,17 @@ use std::io;
 use std::str;
 
 /// Parser for PAF format files
-pub struct PafReader<R: io::Read> {
+pub struct PAFReader<R: io::Read> {
     inner: csv::Reader<R>,
 }
 
-impl<R> PafReader<R>
+impl<R> PAFReader<R>
 where
     R: io::Read,
 {
     /// Create a new PAF parser
     pub fn new(reader: R) -> Self {
-        PafReader {
+        PAFReader {
             inner: ReaderBuilder::new()
                 .delimiter(b'\t')
                 .has_headers(false)
@@ -44,10 +44,10 @@ where
     }
 }
 
-impl PafReader<File> {
+impl PAFReader<File> {
     /// Create a new PAF parser from a file path
-    pub fn from_path<P: AsRef<std::path::Path>>(path: P) -> io::Result<PafReader<File>> {
-        File::open(path).map(PafReader::new)
+    pub fn from_path<P: AsRef<std::path::Path>>(path: P) -> io::Result<PAFReader<File>> {
+        File::open(path).map(PAFReader::new)
     }
 }
 
