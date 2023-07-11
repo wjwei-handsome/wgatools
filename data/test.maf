@@ -2,14 +2,7 @@
 
 a score=222
 s ref    100 12 + 100000 ---AGC-CAT-CATTTT
-
-
-
-
-a score=222
-s ref    100 12 + 100000 ---AGC-CAT-CATTTT
-s contig 0   12 + 12     ---AGC-CAT-CATTTT
-s ww 0   12 + 12     ---AGC-CAT-CATTTT
+s contig 0   12 + 12     GGGAGC-CAT-CATTTT
 
 
 a score=222
