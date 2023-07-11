@@ -9,12 +9,12 @@ fn main() {
     // let mut reader = PafReader::from_path("/Users/wjwei/Zm-CML333.paf").unwrap();
     // reader.convert("tes.blocks", FileFormat::Blocks);
     //
-    let mut reader = MAFReader::from_path("data/test.maf").unwrap();
+    let mut reader = MAFReader::from_path("data/output/test.maf").unwrap();
     let _header = &reader.header;
-    for _record in reader.records() {
+    for record in reader.records() {
         // let record = record.unwrap();
         // println!("{:?}", record);
-        println!("got a record at {}", std::time::SystemTime::now().elapsed().unwrap().as_micros());
+        println!("{}", record.unwrap().get_cigar());
     }
     // println!("{:?}", reader.inner.buffer()); // buffer has been consumed
 }

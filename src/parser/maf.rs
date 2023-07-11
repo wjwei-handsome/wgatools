@@ -1,4 +1,6 @@
+use crate::errors::ParseError;
 use crate::parser::common::{FileFormat, Strand};
+use itertools::Itertools;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader, Read};
@@ -75,27 +77,61 @@ struct MAFSLine {
     seq: String,
 }
 
-impl From<String> for MAFSLine {
-    fn from(value: String) -> Self {
-        // if use nom to parse more fast?
-        let mut iter = value.split_whitespace();
-        let mode = iter.next().unwrap().chars().next().unwrap();
-        let name = iter.next().unwrap().to_string();
-        let start = iter.next().unwrap().parse::<u64>().unwrap();
-        let align_size = iter.next().unwrap().parse::<u64>().unwrap();
-        let strand = iter.next().unwrap().chars().next().unwrap();
-        let size = iter.next().unwrap().parse::<u64>().unwrap();
-        let seq = iter.next().unwrap().to_string();
-        MAFSLine {
-            mode,
-            name,
-            start,
-            align_size,
-            strand: Strand::from(strand),
-            size,
-            seq,
-        }
+fn str2u64(s: &str) -> Result<u64, ParseError> {
+    // TODO: move to common.rs module
+    match s.parse::<u64>() {
+        Ok(n) => Ok(n),
+        Err(_) => Err(ParseError::new_parse_int_err(s)),
     }
+}
+
+fn parse_sline(line: String) -> Result<MAFSLine, ParseError> {
+    let mut iter = line.split_whitespace();
+    let mode = match iter.next() {
+        Some(mode) => mode.chars().next().unwrap(), // TODO: error handling
+        None => panic!("s-line mode is missing"),   // TODO: error handling
+    };
+    let name = match iter.next() {
+        Some(name) => name.to_string(),
+        None => panic!("s-line name is missing"), // TODO: error handling
+    };
+    let start = match iter.next() {
+        Some(start) => str2u64(start)?,
+        None => panic!("s-line start is missing"), // TODO: error handling
+    };
+    let align_size = match iter.next() {
+        Some(align_size) => str2u64(align_size)?, // TODO: error handling
+        None => panic!("s-line align_size is missing"), // TODO: error handling
+    };
+    let strand = match iter.next() {
+        Some(strand) => Strand::from(strand), // TODO: error handling
+        None => panic!("s-line strand is missing"), // TODO: error handling
+    };
+    let size = match iter.next() {
+        Some(size) => str2u64(size)?,
+        None => panic!("s-line size is missing"), // TODO: error handling
+    };
+    let seq = match iter.next() {
+        Some(seq) => seq.to_string(),
+        None => panic!("s-line seq is missing"), // TODO: error handling
+    };
+    if iter.next().is_some() {
+        panic!("s-line has more than 8 fields")
+    };
+    Ok(MAFSLine {
+        mode,
+        name,
+        start,
+        align_size,
+        strand,
+        size,
+        seq,
+    })
+}
+
+fn sline_from_string(value: String) -> Result<MAFSLine, ParseError> {
+    let s_line = parse_sline(value)?;
+    Ok(s_line)
 }
 
 /// A MAF alignment record refer to https://genome.ucsc.edu/FAQ/FAQformat.html#format5
@@ -113,7 +149,7 @@ pub struct MAFRecords<'a, R: io::Read> {
 }
 
 impl Iterator for MAFRecords<'_, File> {
-    type Item = MAFRecord;
+    type Item = Result<MAFRecord, ParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let score = 255;
@@ -128,13 +164,21 @@ impl Iterator for MAFRecords<'_, File> {
                         score,
                         slines: Vec::new(),
                     };
-                    mafrecord.slines.push(MAFSLine::from(line)); // push first s-line
-                                                                 // start read next sequential s-lines
+                    let sline = match sline_from_string(line) {
+                        Ok(sline) => sline,
+                        Err(e) => return Some(Err(e)),
+                    };
+                    mafrecord.slines.push(sline); // push first s-line
+                                                  // start read next sequential s-lines
                     for line in self.inner.lines() {
                         match line {
                             Ok(line) => {
                                 if line.starts_with('s') {
-                                    mafrecord.slines.push(MAFSLine::from(line));
+                                    let sline = match sline_from_string(line) {
+                                        Ok(sline) => sline,
+                                        Err(e) => return Some(Err(e)),
+                                    };
+                                    mafrecord.slines.push(sline);
                                 } else {
                                     // if s-line is over, break
                                     break;
@@ -146,10 +190,40 @@ impl Iterator for MAFRecords<'_, File> {
                             }
                         }
                     }
-                    Some(mafrecord)
+                    Some(Ok(mafrecord))
                 }
             }
             _ => None, // if line is empty, iterator over
         }
+    }
+}
+
+fn cigar_cat(c1: &char, c2: &char) -> &'static str {
+    if c1 == c2 {
+        "M"
+    } else if c1 == &'-' {
+        "I"
+    } else if c2 == &'-' {
+        "D"
+    } else {
+        "M"
+    }
+}
+
+impl MAFRecord {
+    pub fn get_cigar(&self) -> String {
+        let mut cigar = String::new();
+        let seq1_iter = self.slines[0].seq.chars();
+        let seq2_iter = self.slines[1].seq.chars();
+        seq1_iter
+            .zip(seq2_iter)
+            .group_by(|(c1, c2)| cigar_cat(c1, c2))
+            .into_iter()
+            .for_each(|(k, g)| {
+                let len = g.count();
+                cigar.push_str(&len.to_string());
+                cigar.push_str(k);
+            });
+        cigar
     }
 }
