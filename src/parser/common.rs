@@ -46,6 +46,16 @@ impl From<char> for Strand {
     }
 }
 
+impl From<&str> for Strand {
+    fn from(s: &str) -> Self {
+        match s {
+            "+" => Strand::Positive,
+            "-" => Strand::Negative,
+            _ => panic!("Invalid strand character"), // TODO: better error handling
+        }
+    }
+}
+
 impl fmt::Display for Strand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
