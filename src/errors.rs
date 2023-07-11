@@ -2,6 +2,7 @@
 
 use crate::parser::common::FileFormat;
 use std::fmt::Formatter;
+use std::num::ParseIntError;
 use std::{fmt, io};
 
 /// Represents what a file and it's format when error occurs
@@ -24,6 +25,10 @@ pub enum ParseErrorKind {
     Serde,
     /// CIGAR parse error
     ParseCigar,
+    /// MAF s-line parse error
+    ParseSLine,
+    /// Parse Int error
+    ParseInt,
 }
 
 ///The parse error returns
@@ -45,6 +50,17 @@ impl ParseError {
             file_info: FileInfo {
                 name: String::from(""),
                 format,
+            },
+        }
+    }
+
+    pub fn new_parse_int_err(input: &str) -> Self {
+        ParseError {
+            msg: format!("Parse int error, please check the input: {}", input),
+            kind: ParseErrorKind::ParseInt,
+            file_info: FileInfo {
+                name: String::from(""),
+                format: FileFormat::Unknown,
             },
         }
     }
@@ -96,6 +112,19 @@ impl From<csv::Error> for ParseError {
         ParseError {
             msg: err.to_string(),
             kind: ParseErrorKind::Serde,
+            file_info: FileInfo {
+                name: String::new(),
+                format: FileFormat::Unknown,
+            },
+        }
+    }
+}
+
+impl From<ParseIntError> for ParseError {
+    fn from(err: ParseIntError) -> ParseError {
+        ParseError {
+            msg: err.to_string(),
+            kind: ParseErrorKind::ParseInt,
             file_info: FileInfo {
                 name: String::new(),
                 format: FileFormat::Unknown,
