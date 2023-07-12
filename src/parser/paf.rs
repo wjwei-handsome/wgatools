@@ -58,7 +58,7 @@ pub struct PafRecord {
     pub query_length: u64,
     pub query_start: u64,
     pub query_end: u64,
-    pub strand: char,
+    pub strand: Strand,
     pub target_name: String,
     pub target_length: u64,
     pub target_start: u64,
@@ -68,6 +68,27 @@ pub struct PafRecord {
     pub mapq: u64,
     #[serde(default)]
     pub tags: Vec<String>,
+}
+
+/// impl Default for PafRecord
+impl Default for PafRecord {
+    fn default() -> Self {
+        PafRecord {
+            query_name: String::new(),
+            query_length: 0,
+            query_start: 0,
+            query_end: 0,
+            strand: Strand::Positive,
+            target_name: String::new(),
+            target_length: 0,
+            target_start: 0,
+            target_end: 0,
+            matches: 0,
+            block_length: 0,
+            mapq: 0,
+            tags: Vec::new(),
+        }
+    }
 }
 
 /// An iterator struct for PAF records
@@ -101,13 +122,7 @@ impl AlignRecord for PafRecord {
         self.query_end
     }
 
-    fn query_strand(&self) -> Strand {
-        match self.strand {
-            '+' => Strand::Positive,
-            '-' => Strand::Negative,
-            _ => panic!("Invalid strand"),
-        }
-    }
+    fn query_strand(&self) -> Strand { self.strand }
 
     fn target_name(&self) -> &str {
         &self.target_name

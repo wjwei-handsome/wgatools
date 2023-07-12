@@ -142,13 +142,23 @@ pub struct MAFRecord {
     slines: Vec<MAFSLine>,
 }
 
+/// impl Default trait for MAFRecord
+impl Default for MAFRecord {
+    fn default() -> Self {
+        MAFRecord {
+            score: 255,
+            slines: Vec::new(),
+        }
+    }
+}
+
 /// A MAF record iterator
 /// two s-lines should be a record
 pub struct MAFRecords<'a, R: io::Read> {
     inner: &'a mut BufReader<R>,
 }
 
-impl Iterator for MAFRecords<'_, File> {
+impl<R: io::Read> Iterator for MAFRecords<'_, R> {
     type Item = Result<MAFRecord, ParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {

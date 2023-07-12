@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use crate::parser::maf::MAFRecord;
+use crate::parser::paf::PafRecord;
 
 /// Enum the file types
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -77,6 +79,21 @@ pub struct Block<'a> {
     pub(crate) strand: Strand,
 }
 
+/// impl Default for Block
+impl<'a> Default for Block<'a> {
+    fn default() -> Self {
+        Block {
+            query_name: "",
+            query_start: 0,
+            query_end: 0,
+            target_name: "",
+            target_start: 0,
+            target_end: 0,
+            strand: Strand::Positive,
+        }
+    }
+}
+
 pub trait AlignRecord {
     fn query_name(&self) -> &str;
     fn query_length(&self) -> u64;
@@ -89,4 +106,9 @@ pub trait AlignRecord {
     fn target_end(&self) -> u64;
     fn target_strand(&self) -> Strand;
     fn get_cigar_bytes(&self) -> &[u8];
+    fn convert2block(&self) -> Block {
+        Block::default()
+    }
+    fn convert2paf(&self) -> PafRecord { PafRecord::default() }
+    fn convert2maf(&self) -> MAFRecord { MAFRecord::default() }
 }
