@@ -1,9 +1,9 @@
 use crate::errors::ParseError;
-use crate::parser::common::{FileFormat, Strand};
-use itertools::Itertools;
+use crate::parser::common::{AlignRecord, FileFormat, Strand};
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader, Read};
+use crate::parser::cigar::parse_maf_seq_to_cigar;
 
 /// Parser for MAF file format
 pub struct MAFReader<R: io::Read> {
@@ -158,6 +158,7 @@ pub struct MAFRecords<'a, R: io::Read> {
     inner: &'a mut BufReader<R>,
 }
 
+/// impl Iterator trait for MAFRecords
 impl<R: io::Read> Iterator for MAFRecords<'_, R> {
     type Item = Result<MAFRecord, ParseError>;
 
@@ -208,32 +209,57 @@ impl<R: io::Read> Iterator for MAFRecords<'_, R> {
     }
 }
 
-fn cigar_cat(c1: &char, c2: &char) -> &'static str {
-    if c1 == c2 {
-        "M"
-    } else if c1 == &'-' {
-        "I"
-    } else if c2 == &'-' {
-        "D"
-    } else {
-        "M"
+/// impl AlignRecord Trait for PafRecord
+impl AlignRecord for MAFRecord {
+    fn query_name(&self) -> &str {
+        self.slines[1].name.as_str()
     }
-}
 
-impl MAFRecord {
-    pub fn get_cigar(&self) -> String {
-        let mut cigar = String::new();
-        let seq1_iter = self.slines[0].seq.chars();
-        let seq2_iter = self.slines[1].seq.chars();
-        seq1_iter
-            .zip(seq2_iter)
-            .group_by(|(c1, c2)| cigar_cat(c1, c2))
-            .into_iter()
-            .for_each(|(k, g)| {
-                let len = g.count();
-                cigar.push_str(&len.to_string());
-                cigar.push_str(k);
-            });
-        cigar
+    fn query_length(&self) -> u64 {
+        self.slines[1].size
+    }
+
+    fn query_start(&self) -> u64 {
+        self.slines[1].start
+    }
+
+    fn query_end(&self) -> u64 {
+        self.slines[1].start + self.slines[1].align_size
+    }
+
+    fn query_strand(&self) -> Strand {
+        self.slines[1].strand
+    }
+
+    fn target_name(&self) -> &str {
+        self.slines[0].name.as_str()
+    }
+
+    fn target_length(&self) -> u64 {
+        self.slines[0].size
+    }
+
+    fn target_start(&self) -> u64 {
+        self.slines[0].start
+    }
+
+    fn target_end(&self) -> u64 {
+        self.slines[0].start + self.slines[0].align_size
+    }
+
+    fn target_strand(&self) -> Strand {
+        self.slines[0].strand
+    }
+
+    fn get_cigar_string(&self) -> String {
+        parse_maf_seq_to_cigar(self)
+    }
+
+    fn query_seq(&self) -> &str {
+        &self.slines[1].seq
+    }
+
+    fn target_seq(&self) -> &str {
+        &self.slines[0].seq
     }
 }

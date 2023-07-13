@@ -8,6 +8,7 @@ use nom::multi::fold_many0;
 use nom::IResult;
 use std::io::Write;
 use std::str;
+use itertools::Itertools;
 
 /// CigarUnit is a atom operation in cigar string
 #[derive(Debug)]
@@ -156,4 +157,34 @@ pub fn parse_cigar_to_chain<'a, T: AlignRecord>(
     wtr.write_all(format!("\n{}", dataline.size).as_bytes())
         .unwrap(); // TODO: handle IO error
     Ok((rest, res))
+}
+
+/// cigar category method
+fn cigar_cat(c1: &char, c2: &char) -> &'static str {
+    if c1 == c2 {
+        "M"
+    } else if c1 == &'-' {
+        "I"
+    } else if c2 == &'-' {
+        "D"
+    } else {
+        "M"
+    }
+}
+
+/// parse MAF two seqs into cigar string
+pub fn parse_maf_seq_to_cigar<T: AlignRecord>(rec: &T) -> String {
+    let mut cigar = String::new();
+    let seq1_iter = rec.target_seq().chars();
+    let seq2_iter = rec.query_seq().chars();
+    seq1_iter
+        .zip(seq2_iter)
+        .group_by(|(c1, c2)| cigar_cat(c1, c2))
+        .into_iter()
+        .for_each(|(k, g)| {
+            let len = g.count();
+            cigar.push_str(&len.to_string());
+            cigar.push_str(k);
+        });
+    cigar
 }
