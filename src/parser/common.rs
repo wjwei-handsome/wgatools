@@ -105,10 +105,18 @@ pub trait AlignRecord {
     fn target_start(&self) -> u64;
     fn target_end(&self) -> u64;
     fn target_strand(&self) -> Strand;
-    fn get_cigar_bytes(&self) -> &[u8];
-    fn convert2block(&self) -> Block {
-        Block::default()
+    fn get_cigar_bytes(&self) -> &[u8] {
+        b"*"
     }
-    fn convert2paf(&self) -> PafRecord { PafRecord::default() }
-    fn convert2maf(&self) -> MAFRecord { MAFRecord::default() }
+    fn get_cigar_string(&self) -> String {
+        "*".to_string()
+    }
+    fn convert2paf(&self, output: &str) -> PafRecord { PafRecord::default() }
+    fn convert2maf(&self, output: &str) -> MAFRecord { MAFRecord::default() }
+    fn query_seq(&self) -> &str {
+        ""
+    }
+    fn target_seq(&self) -> &str {
+        ""
+    }
 }
