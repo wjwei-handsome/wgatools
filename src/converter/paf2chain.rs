@@ -6,7 +6,7 @@ use std::io;
 use std::io::Write;
 
 /// Convert a PAF Reader to output a Chain file
-pub fn paf2chains<R: io::Read>(pafreader: &mut PAFReader<R>, outputpath: &str) {
+pub fn paf2chain<R: io::Read>(pafreader: &mut PAFReader<R>, outputpath: &str) {
     // init writer
     let mut writer = output_writer(outputpath);
 

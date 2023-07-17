@@ -1,5 +1,5 @@
 use crate::converter::paf2block::paf2blocks;
-use crate::converter::paf2chain::paf2chains;
+use crate::converter::paf2chain::paf2chain;
 use crate::parser::common::{AlignRecord, FileFormat, Strand};
 use csv::{DeserializeRecordsIter, ReaderBuilder};
 use serde::{Deserialize, Serialize};
@@ -37,7 +37,7 @@ where
     /// convert method
     pub fn convert(&mut self, outputpath: &str, format: FileFormat) {
         match format {
-            FileFormat::Chain => paf2chains(self, outputpath),
+            FileFormat::Chain => paf2chain(self, outputpath),
             FileFormat::Blocks => paf2blocks(self, outputpath),
             _ => {}
         }
