@@ -1,6 +1,7 @@
 use crate::parser::chain::ChainDataLine;
 use crate::parser::common::{AlignRecord, Block};
 use csv::Writer;
+use itertools::Itertools;
 use nom::bytes::complete::{tag, take_while};
 use nom::character::{is_alphabetic, is_digit};
 use nom::error::Error;
@@ -8,11 +9,10 @@ use nom::multi::fold_many0;
 use nom::IResult;
 use std::io::Write;
 use std::str;
-use itertools::Itertools;
 
 /// CigarUnit is a atom operation in cigar string
 #[derive(Debug)]
-pub struct CigarUnit {
+struct CigarUnit {
     op: char, // M, I, D, N, S, H, P, =, X operations
     len: u64, // length of the operation
 }
@@ -162,29 +162,81 @@ pub fn parse_cigar_to_chain<'a, T: AlignRecord>(
 /// cigar category method
 fn cigar_cat(c1: &char, c2: &char) -> &'static str {
     if c1 == c2 {
-        "M"
+        "="
     } else if c1 == &'-' {
         "I"
     } else if c2 == &'-' {
         "D"
     } else {
-        "M"
+        "X"
     }
 }
 
+pub struct Cigar {
+    pub cigar_string: String,
+    pub match_count: usize,
+    pub ins_count: usize,
+    pub del_count: usize,
+    pub mismatch_count: usize,
+}
+
 /// parse MAF two seqs into cigar string
-pub fn parse_maf_seq_to_cigar<T: AlignRecord>(rec: &T) -> String {
-    let mut cigar = String::new();
+pub fn parse_maf_seq_to_cigar<T: AlignRecord>(rec: &T) -> Cigar {
+    let mut cigar_string = String::new();
     let seq1_iter = rec.target_seq().chars();
     let seq2_iter = rec.query_seq().chars();
-    seq1_iter
+    let mut match_count = 0;
+    let mut ins_count = 0;
+    let mut del_count = 0;
+    let mut mismatch_count = 0;
+    let group_by_iter = seq1_iter
         .zip(seq2_iter)
-        .group_by(|(c1, c2)| cigar_cat(c1, c2))
-        .into_iter()
-        .for_each(|(k, g)| {
-            let len = g.count();
-            cigar.push_str(&len.to_string());
-            cigar.push_str(k);
-        });
-    cigar
+        .group_by(|(c1, c2)| cigar_cat(c1, c2));
+
+    let mut result_len = 0;
+    for (k, g) in group_by_iter.into_iter() {
+        let len = g.count();
+        // cigar_string.push_str(&len.to_string());
+        // 10=5X1D2I ==> 15M1D2I
+        match k {
+            "=" => {
+                match_count += len;
+                result_len += len;
+            }
+            "I" => {
+                if result_len != 0 {
+                    cigar_string.push_str(&result_len.to_string());
+                    cigar_string.push('M');
+                }
+                ins_count += len;
+                cigar_string.push_str(&len.to_string());
+                cigar_string.push_str(k);
+                result_len = 0;
+            }
+            "D" => {
+                if result_len != 0 {
+                    cigar_string.push_str(&result_len.to_string());
+                    cigar_string.push('M');
+                }
+                del_count += len;
+                cigar_string.push_str(&len.to_string());
+                cigar_string.push_str(k);
+                result_len = 0;
+            }
+            "X" => {
+                mismatch_count += len;
+                result_len += len;
+            }
+            _ => {}
+        };
+    }
+    cigar_string.push_str(&result_len.to_string());
+    cigar_string.push('M');
+    Cigar {
+        cigar_string,
+        match_count,
+        ins_count,
+        del_count,
+        mismatch_count,
+    }
 }
