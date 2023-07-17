@@ -11,6 +11,9 @@ fn main() {
     reader.convert("out.chain", FileFormat::Chain);
     let mut reader = PafReader::from_path(your_path).unwrap();
     reader.convert("out.blocks", FileFormat::Blocks);
+    let your_maf_path = "/your/path/to/your.maf";
+    let mut reader = MafReader::from_path(your_path).unwrap();
+    reader.convert("test.paf", FileFormat::Paf);
 }
 ```
 > It should be extremely fast!![img](https://raw.githubusercontent.com/wjwei-handsome/wwjPic/main/img/20230706022535.png)
