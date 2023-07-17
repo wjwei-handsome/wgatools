@@ -1,3 +1,4 @@
+use crate::parser::common::AlignRecord;
 use crate::parser::maf::MAFReader;
 use crate::utils::output_writer;
 use std::io;
@@ -8,12 +9,15 @@ pub fn maf2paf<R: io::Read>(mafreader: &mut MAFReader<R>, outputpath: &str) {
     let writer = output_writer(outputpath);
     let mut wtr = csv::WriterBuilder::new()
         .delimiter(b'\t')
+        .has_headers(false)
         .from_writer(writer);
 
     // iterate over records
     for record in mafreader.records() {
-        let record = record.unwrap(); // TODO: handle parse error
+        let mafrecord = record.unwrap(); // TODO: handle parse error
 
-        // nom the cigar string and write to file
+        let pafrecord = mafrecord.convert2paf();
+        wtr.serialize(pafrecord).unwrap(); // TODO: handle serialize error
     }
+    wtr.flush().unwrap(); // TODO: handle IO error
 }
