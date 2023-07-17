@@ -1,9 +1,11 @@
+use crate::converter::maf2paf::maf2paf;
 use crate::errors::ParseError;
+use crate::parser::cigar::parse_maf_seq_to_cigar;
 use crate::parser::common::{AlignRecord, FileFormat, Strand};
+use crate::parser::paf::PafRecord;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader, Read};
-use crate::parser::cigar::parse_maf_seq_to_cigar;
 
 /// Parser for MAF file format
 pub struct MAFReader<R: io::Read> {
@@ -42,10 +44,13 @@ where
     }
 
     /// convert method
-    pub fn convert(&mut self, _outputpath: &str, format: FileFormat) {
+    pub fn convert(&mut self, outputpath: &str, format: FileFormat) {
         match format {
             FileFormat::Chain => {}
             FileFormat::Blocks => {}
+            FileFormat::Paf => {
+                maf2paf(self, outputpath);
+            }
             _ => {}
         }
     }
@@ -252,7 +257,33 @@ impl AlignRecord for MAFRecord {
     }
 
     fn get_cigar_string(&self) -> String {
-        parse_maf_seq_to_cigar(self)
+        parse_maf_seq_to_cigar(self).cigar_string
+    }
+
+    fn convert2paf(&self) -> PafRecord {
+        let cigar = parse_maf_seq_to_cigar(self);
+        let cigar_string = String::from("cg:Z:") + &cigar.cigar_string;
+        let matches = cigar.match_count as u64;
+        let block_length =
+            (cigar.match_count + cigar.mismatch_count + cigar.ins_count + cigar.del_count) as u64;
+        let edit_dist = cigar.mismatch_count + cigar.ins_count + cigar.del_count;
+        let nm_tag = String::from("NM:i:") + &*edit_dist.to_string();
+
+        PafRecord {
+            query_name: self.query_name().to_string(),
+            query_length: self.query_length(),
+            query_start: self.query_start(),
+            query_end: self.query_end(),
+            strand: self.query_strand(),
+            target_name: self.target_name().to_string(),
+            target_length: self.target_length(),
+            target_start: self.target_start(),
+            target_end: self.target_end(),
+            matches,
+            block_length,
+            mapq: 255,
+            tags: vec![nm_tag, cigar_string],
+        }
     }
 
     fn query_seq(&self) -> &str {
