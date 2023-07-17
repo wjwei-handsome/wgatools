@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
-use std::fmt;
 use crate::parser::maf::MAFRecord;
 use crate::parser::paf::PafRecord;
+use serde::{Deserialize, Serialize};
+use std::fmt;
 
 /// Enum the file types
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -111,8 +111,12 @@ pub trait AlignRecord {
     fn get_cigar_string(&self) -> String {
         "*".to_string()
     }
-    fn convert2paf(&self, output: &str) -> PafRecord { PafRecord::default() }
-    fn convert2maf(&self, output: &str) -> MAFRecord { MAFRecord::default() }
+    fn convert2paf(&self) -> PafRecord {
+        PafRecord::default()
+    }
+    fn convert2maf(&self) -> MAFRecord {
+        MAFRecord::default()
+    }
     fn query_seq(&self) -> &str {
         ""
     }
