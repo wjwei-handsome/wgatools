@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io;
 use std::str;
+use crate::converter::paf2maf::paf2maf;
 
 /// Parser for PAF format files
 pub struct PAFReader<R: io::Read> {
@@ -39,6 +40,7 @@ where
         match format {
             FileFormat::Chain => paf2chain(self, outputpath),
             FileFormat::Blocks => paf2blocks(self, outputpath),
+            FileFormat::Maf => paf2maf(self, outputpath),
             _ => {}
         }
     }

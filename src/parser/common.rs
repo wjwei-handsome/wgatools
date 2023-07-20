@@ -1,6 +1,8 @@
 use crate::parser::maf::MAFRecord;
 use crate::parser::paf::PafRecord;
+use noodles_sam::alignment::Record as SamRecord;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt;
 
 /// Enum the file types
@@ -30,7 +32,7 @@ pub struct SeqInfo {
     pub end: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Copy, Serialize, Deserialize, Eq)]
 pub enum Strand {
     #[serde(rename = "+")]
     Positive,
@@ -116,6 +118,9 @@ pub trait AlignRecord {
     }
     fn convert2maf(&self) -> MAFRecord {
         MAFRecord::default()
+    }
+    fn convert2bam(&self, _name_id_map: &HashMap<&str, u64>) -> SamRecord {
+        SamRecord::default()
     }
     fn query_seq(&self) -> &str {
         ""

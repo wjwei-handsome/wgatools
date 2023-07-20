@@ -1,8 +1,15 @@
+use crate::converter::maf2bam::maf2bam;
+use crate::converter::maf2chain::maf2chain;
 use crate::converter::maf2paf::maf2paf;
 use crate::errors::ParseError;
 use crate::parser::cigar::parse_maf_seq_to_cigar;
 use crate::parser::common::{AlignRecord, FileFormat, Strand};
 use crate::parser::paf::PafRecord;
+use noodles_core::Position;
+use noodles_sam::alignment::Record as SamRecord;
+use noodles_sam::record::{Cigar, Data, Flags, ReadName, Sequence};
+use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader, Read};
@@ -46,8 +53,12 @@ where
     /// convert method
     pub fn convert(&mut self, outputpath: &str, format: FileFormat) {
         match format {
-            FileFormat::Chain => {}
-            FileFormat::Blocks => {}
+            FileFormat::Chain => {
+                maf2chain(self, outputpath);
+            }
+            FileFormat::Bam => {
+                maf2bam(self, outputpath);
+            }
             FileFormat::Paf => {
                 maf2paf(self, outputpath);
             }
@@ -71,7 +82,7 @@ impl MAFReader<File> {
 // a score=222
 // s ref    100 12 + 100000 ---AGC-CAT-CATTTT
 // s contig 0   12 + 12     ---AGC-CAT-CATTTT
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 struct MAFSLine {
     mode: char,
     name: String,
@@ -141,10 +152,31 @@ fn sline_from_string(value: String) -> Result<MAFSLine, ParseError> {
 
 /// A MAF alignment record refer to https://genome.ucsc.edu/FAQ/FAQformat.html#format5
 /// a pair of a-lines should be a align record
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct MAFRecord {
     score: u64,
     slines: Vec<MAFSLine>,
+}
+
+// TODO: impl a derive macro for AlignRecord to cmp by target_start and target_name
+impl PartialOrd<Self> for MAFRecord {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.cmp(other).into()
+    }
+}
+
+impl Ord for MAFRecord {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let t1_name = self.target_name();
+        let t1_start = self.target_start();
+        let t2_name = other.target_name();
+        let t2_start = other.target_start();
+        if t1_name == t2_name {
+            t1_start.cmp(&t2_start)
+        } else {
+            natord::compare(t1_name, t2_name)
+        }
+    }
 }
 
 /// impl Default trait for MAFRecord
@@ -257,11 +289,11 @@ impl AlignRecord for MAFRecord {
     }
 
     fn get_cigar_string(&self) -> String {
-        parse_maf_seq_to_cigar(self).cigar_string
+        parse_maf_seq_to_cigar(self, false).cigar_string
     }
 
     fn convert2paf(&self) -> PafRecord {
-        let cigar = parse_maf_seq_to_cigar(self);
+        let cigar = parse_maf_seq_to_cigar(self, false);
         let cigar_string = String::from("cg:Z:") + &cigar.cigar_string;
         let matches = cigar.match_count as u64;
         let block_length =
@@ -292,5 +324,47 @@ impl AlignRecord for MAFRecord {
 
     fn target_seq(&self) -> &str {
         &self.slines[0].seq
+    }
+
+    fn convert2bam(&self, name_id_map: &HashMap<&str, u64>) -> SamRecord {
+        // init a bam record
+        let mut bamrec = SamRecord::default();
+
+        // set bam record query name
+        let q_name = self.query_name();
+        let q_name: ReadName = q_name.parse().unwrap(); // TODO: handle parse error
+        *bamrec.read_name_mut() = Some(q_name);
+
+        // set bam record flags: it always in empty in whole genome alignment
+        *bamrec.flags_mut() = Flags::empty();
+
+        // set bam record reference sequence id ref to name-id-map
+        let t_name = self.target_name();
+        let t_id = *name_id_map.get(t_name).unwrap();
+        *bamrec.reference_sequence_id_mut() = Some(t_id as usize);
+
+        // set bam record position
+        let t_start = self.target_start() + 1; // 0-based to 1-based
+        *bamrec.alignment_start_mut() = Position::new(t_start as usize);
+
+        // set bam record cigar
+        let gen_cigar = parse_maf_seq_to_cigar(self, false);
+        let cigar: Cigar = gen_cigar.cigar_string.parse().unwrap();
+        *bamrec.cigar_mut() = cigar;
+
+        // set bam record sequence
+        let mut q_seq_ref = self.query_seq().to_string();
+        q_seq_ref.retain(|c| c != '-'); // remove gap;should be UPPER?
+        let q_seq: Sequence = q_seq_ref.parse().unwrap();
+        *bamrec.sequence_mut() = q_seq;
+
+        // set bam record tags
+        let edit_dist = gen_cigar.mismatch_count + gen_cigar.ins_count + gen_cigar.del_count;
+        let nm_tag = String::from("NM:i:") + &*edit_dist.to_string();
+        let tag: Data = nm_tag.parse().unwrap();
+        *bamrec.data_mut() = tag;
+
+        // return bam record
+        bamrec
     }
 }

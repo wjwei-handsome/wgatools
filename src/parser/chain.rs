@@ -1,4 +1,5 @@
 use crate::parser::common::{AlignRecord, SeqInfo, Strand};
+use crate::parser::maf::MAFRecord;
 use crate::parser::paf::PafRecord;
 use std::fmt;
 
@@ -54,6 +55,29 @@ impl From<&PafRecord> for Header {
                 strand: value.query_strand(),
                 start: value.query_start,
                 end: value.query_end,
+            },
+            chain_id: 0,
+        }
+    }
+}
+
+impl From<&MAFRecord> for Header {
+    fn from(value: &MAFRecord) -> Self {
+        Header {
+            score: 255.0,
+            target: SeqInfo {
+                name: value.target_name().to_owned(),
+                size: value.target_length(),
+                strand: Strand::Positive,
+                start: value.target_start(),
+                end: value.target_end(),
+            },
+            query: SeqInfo {
+                name: value.query_name().to_owned(),
+                size: value.query_length(),
+                strand: value.query_strand(),
+                start: value.query_start(),
+                end: value.query_end(),
             },
             chain_id: 0,
         }
