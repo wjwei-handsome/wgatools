@@ -2,7 +2,29 @@
 
 ### !!! Early Stage !!!
 
-### A sample example of conversion from PAF to Chain or Blocks
+### WHAT HAVE DONE
+- [x] PAF format reader
+- [x] MAF format reader
+- [x] CIGAR string parser
+- [x] MAF2PAF
+- [x] MAF2Chain
+- [x] MAF2BAM
+- [x] PAF2Chain
+- [x] PAF2Blocks
+- [x] PAF2MAF
+- [x] Call Variants from MAF
+
+### WHAT WILL DO
+- [ ] convert MAF to [blocks, delta]
+- [ ] convert PAF to [bam, chain]
+- [ ] convert BAM to [blocks, delta, MAF, PAF, chain]
+- [ ] convert chains to [delta, MAF, PAF, blocks]
+- [ ] convert delta to [chain, MAF, PAF, blocks]
+- >NOTE: some conversions is unnecessary, but it's a good practice to implement them.
+- [ ] visualize genome alignment
+- [ ] call variants and statistics/visualize them
+
+### A sample example of conversions
 
 ```rust
 fn main() {
