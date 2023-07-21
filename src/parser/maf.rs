@@ -15,14 +15,14 @@ use std::io;
 use std::io::{BufRead, BufReader, Read};
 
 /// Parser for MAF file format
-pub struct MAFReader<R: io::Read> {
+pub struct MAFReader<R: Read> {
     inner: BufReader<R>,
     pub header: String,
 }
 
 impl<R> MAFReader<R>
 where
-    R: io::Read,
+    R: Read+Send,
 {
     /// Create a new PAF parser
     pub fn new(reader: R) -> Self {
@@ -191,12 +191,12 @@ impl Default for MAFRecord {
 
 /// A MAF record iterator
 /// two s-lines should be a record
-pub struct MAFRecords<'a, R: io::Read> {
+pub struct MAFRecords<'a, R: Read+Send> {
     inner: &'a mut BufReader<R>,
 }
 
 /// impl Iterator trait for MAFRecords
-impl<R: io::Read> Iterator for MAFRecords<'_, R> {
+impl<R: Read+Send> Iterator for MAFRecords<'_, R> {
     type Item = Result<MAFRecord, ParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -318,14 +318,6 @@ impl AlignRecord for MAFRecord {
         }
     }
 
-    fn query_seq(&self) -> &str {
-        &self.slines[1].seq
-    }
-
-    fn target_seq(&self) -> &str {
-        &self.slines[0].seq
-    }
-
     fn convert2bam(&self, name_id_map: &HashMap<&str, u64>) -> SamRecord {
         // init a bam record
         let mut bamrec = SamRecord::default();
@@ -366,5 +358,13 @@ impl AlignRecord for MAFRecord {
 
         // return bam record
         bamrec
+    }
+
+    fn query_seq(&self) -> &str {
+        &self.slines[1].seq
+    }
+
+    fn target_seq(&self) -> &str {
+        &self.slines[0].seq
     }
 }
