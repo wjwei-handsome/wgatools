@@ -10,6 +10,7 @@ use nom::multi::fold_many0;
 use nom::IResult;
 use std::io::Write;
 use std::str;
+use rayon::prelude::*;
 
 /// CigarUnit is a atom operation in cigar string
 #[derive(Debug)]
@@ -181,6 +182,7 @@ pub fn parse_maf_seq_to_cigar<T: AlignRecord>(rec: &T, with_h: bool) -> Cigar {
     let mut del_count = 0;
     let mut mismatch_count = 0;
     let group_by_iter = seq1_iter
+        // .par_bridge().into_par_iter()
         .zip(seq2_iter)
         .group_by(|(c1, c2)| cigar_cat_ext(c1, c2));
 
@@ -300,4 +302,42 @@ fn cigar_unit_chain(
         _ => {} // TODO: handle 'H' for SAM
     };
     Ok(())
+}
+
+/// Parse cigar to insert `-` in MAF sequences
+pub fn parse_cigar_to_insert<'a, T: AlignRecord>(
+    rec: &'a T,
+    t_seq: &mut String,
+    q_seq: &mut String,
+) -> IResult<&'a [u8], ()> {
+    // get cigar bytes and tag
+    let cigar = rec.get_cigar_bytes();
+    let (cigar, _tag) = tag(b"cg:Z:")(cigar)?;
+
+    // fold cigar bytes into many CigarUnits[#CigarUnit]
+    let mut current_offset = 0;
+    let (rest, res) = fold_many0(parse_cigar_unit, null, |(), cigarunit| {
+        let op = cigarunit.op;
+        let count = cigarunit.len;
+        match op {
+            'M' | '=' | 'X' => {
+                // do nothing but move offset
+                current_offset += count;
+            }
+            'I' => {
+                // insert '-' into target seq
+                let ins_str = "-".repeat(count as usize);
+                t_seq.insert_str(current_offset as usize, &ins_str);
+                current_offset += count;
+            }
+            'D' => {
+                // insert '-' into query seq
+                let del_str = "-".repeat(count as usize);
+                q_seq.insert_str(current_offset as usize, &del_str);
+                current_offset += count;
+            }
+            _ => {} // TODO: handle 'H' for SAM
+        };
+    })(cigar)?;
+    Ok((rest, res))
 }
