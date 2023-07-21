@@ -13,7 +13,7 @@ use noodles_sam::header::record::value::map::Program;
 use noodles_sam::header::record::value::{map::ReferenceSequence, Map};
 
 /// Convert a MAF Reader to output a BAM file
-pub fn maf2bam<R: io::Read>(mafreader: &mut MAFReader<R>, outputpath: &str) {
+pub fn maf2bam<R: io::Read+Send>(mafreader: &mut MAFReader<R>, outputpath: &str) {
     // init a writer with output path, not support stdout
     let mut writer = bam::writer::Builder::default()
         .build_from_path(outputpath)
@@ -35,6 +35,7 @@ pub fn maf2bam<R: io::Read>(mafreader: &mut MAFReader<R>, outputpath: &str) {
     // collect all maf records and sort by target name and target pos
     let mut mafrecords = mafreader
         .records()
+        .par_bridge()
         .map(|rec| rec.unwrap())
         .collect::<Vec<_>>();
     mafrecords.sort();
