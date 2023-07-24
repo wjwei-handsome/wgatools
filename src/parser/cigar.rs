@@ -10,7 +10,11 @@ use nom::multi::fold_many0;
 use nom::IResult;
 use std::io::Write;
 use std::str;
-use rayon::prelude::*;
+// use noodles_sam::record::Cigar as SamCigar;
+// use noodles_sam::record::cigar::Op;
+// use noodles_sam::record::cigar::op::Kind::{Deletion, HardClip, Insertion, Match};
+// use rayon::prelude::*;
+use rust_htslib::bam::record::{Cigar as BamCigar, CigarString};
 
 /// CigarUnit is a atom operation in cigar string
 #[derive(Debug)]
@@ -166,6 +170,7 @@ pub fn cigar_cat(c1: &char, c2: &char) -> char {
 
 pub struct Cigar {
     pub cigar_string: String,
+    pub bamcigar: CigarString,
     pub match_count: usize,
     pub ins_count: usize,
     pub del_count: usize,
@@ -182,15 +187,17 @@ pub fn parse_maf_seq_to_cigar<T: AlignRecord>(rec: &T, with_h: bool) -> Cigar {
     let mut del_count = 0;
     let mut mismatch_count = 0;
     let group_by_iter = seq1_iter
-        // .par_bridge().into_par_iter()
+        // .into_par_iter()
         .zip(seq2_iter)
         .group_by(|(c1, c2)| cigar_cat_ext(c1, c2));
 
-    let begin = rec.query_start();
+    let begin = rec.query_start() as usize;
     let end = rec.query_length() - rec.query_end();
+    let mut bamcigar = Vec::new();
     if with_h {
         cigar_string.push_str(&begin.to_string());
         cigar_string.push('H');
+        bamcigar.push(BamCigar::HardClip(begin as u32));
     }
 
     let mut result_len = 0;
@@ -206,20 +213,24 @@ pub fn parse_maf_seq_to_cigar<T: AlignRecord>(rec: &T, with_h: bool) -> Cigar {
                 if result_len != 0 {
                     cigar_string.push_str(&result_len.to_string());
                     cigar_string.push('M');
+                    bamcigar.push(BamCigar::Match(result_len as u32));
                 }
                 ins_count += len;
                 cigar_string.push_str(&len.to_string());
                 cigar_string.push(k);
+                bamcigar.push(BamCigar::Ins(len as u32));
                 result_len = 0;
             }
             'D' => {
                 if result_len != 0 {
                     cigar_string.push_str(&result_len.to_string());
                     cigar_string.push('M');
+                    bamcigar.push(BamCigar::Match(result_len as u32));
                 }
                 del_count += len;
                 cigar_string.push_str(&len.to_string());
                 cigar_string.push(k);
+                bamcigar.push(BamCigar::Del(len as u32));
                 result_len = 0;
             }
             'X' => {
@@ -231,14 +242,19 @@ pub fn parse_maf_seq_to_cigar<T: AlignRecord>(rec: &T, with_h: bool) -> Cigar {
     }
     cigar_string.push_str(&result_len.to_string());
     cigar_string.push('M');
+    bamcigar.push(BamCigar::Match(result_len as u32));
 
     if with_h {
         cigar_string.push_str(&end.to_string());
         cigar_string.push('H');
+        bamcigar.push(BamCigar::HardClip(end as u32));
     }
+
+    let bamcigar = CigarString(bamcigar);
 
     Cigar {
         cigar_string,
+        bamcigar,
         match_count,
         ins_count,
         del_count,
