@@ -2,17 +2,12 @@ use crate::parser::cigar::cigar_cat_ext;
 use crate::parser::common::AlignRecord;
 use crate::parser::maf::{MAFReader, MAFRecord};
 use itertools::Itertools;
-use noodles_vcf::header::record::value::map::Info;
+use noodles_vcf::header::record::value::map::{Contig, Info};
 use noodles_vcf::record::genotypes::sample::Value;
 use noodles_vcf::record::info::field;
 use noodles_vcf::record::info::field::key;
 use noodles_vcf::record::Genotypes;
-use noodles_vcf::{
-    self as vcf,
-    header::record::value::{map::Contig, Map},
-    record::Position,
-    Record,
-};
+use noodles_vcf::{self as vcf, header::record::value::Map, record::Position, Record};
 use rayon::prelude::*;
 use std::io::BufWriter;
 
@@ -25,7 +20,8 @@ use std::io::BufWriter;
 /// between alignment: INS | DEL | Repeat expansion | Repeat contraction
 
 pub fn test_call() {
-    let mut reader = MAFReader::from_path("/Users/wjwei/NAM2B73v5.Zm-CML333__TO__Zm-B73v5.maf").unwrap();
+    let mut reader =
+        MAFReader::from_path("/Users/wjwei/NAM2B73v5.Zm-CML333__TO__Zm-B73v5.maf").unwrap();
     let _header = &reader.header;
 
     let mut wrt = BufWriter::new(std::fs::File::create("test.vcf").unwrap());
@@ -34,81 +30,74 @@ pub fn test_call() {
     let id = key::SV_LENGTHS;
     let info = Map::<Info>::from(&id);
 
-
     let mut header = vcf::Header::builder()
-        // .add_contig("chr1".parse().unwrap(), contigmap)
         .add_info(id, info)
         .add_sample_name("sample1")
         .build();
     // vcf_wrt.write_header(&header).expect("TODO: panic message");
 
-    let mut final_var_recs = reader
+    let mut mafrecords = reader
         .records()
         .par_bridge()
         .into_par_iter()
-        .map(|rec| {
-            let rec = rec.unwrap();
-            let var_recs = call_maf_snp_indel_within(&rec);
-            var_recs
-        })
+        .map(|rec| rec.unwrap())
+        // .for_each(|mut rec| {
+        //     println!("got a record");
+        // });
+        .collect::<Vec<_>>();
+    mafrecords.sort();
+    let final_var_recs = mafrecords
+        .par_iter()
+        .map(call_maf_snp_indel_within)
         .flatten()
-        .for_each(|mut rec| {
-            println!("got a record");
-        });
-        // .collect::<Vec<_>>();
-    // mafrecords.sort();
-    // let final_var_recs = mafrecords
-    //     .par_iter()
-    //     .map(call_maf_snp_indel_within)
-    //     .flatten()
-    //     .collect::<Vec<_>>();
-    // let name_size = mafrecords
-    //     .par_iter()
-    //     .map(|mafrec| (mafrec.target_name(), mafrec.target_length()))
-    //     .collect::<Vec<_>>();
-    // for (name, size) in name_size {
-    //     if !header.contigs().contains_key(name) {
-    //         let mut contigmap = Map::<Contig>::new();
-    //         *contigmap.length_mut() = Some(size as usize);
-    //         header
-    //             .contigs_mut()
-    //             .insert(name.parse().unwrap(), contigmap);
-    //     } else {
-    //         continue;
-    //     }
-    // }
+        .collect::<Vec<_>>();
+    let name_size = mafrecords
+        .par_iter()
+        .map(|mafrec| (mafrec.target_name(), mafrec.target_length()))
+        .collect::<Vec<_>>();
+    for (name, size) in name_size {
+        if !header.contigs().contains_key(name) {
+            let mut contigmap = Map::<Contig>::new();
+            *contigmap.length_mut() = Some(size as usize);
+            header
+                .contigs_mut()
+                .insert(name.parse().unwrap(), contigmap);
+        } else {
+            continue;
+        }
+    }
     // println!("var_rec collected");
     // let header = header_builder.build();
-    // vcf_wrt.write_header(&header).expect("TODO: panic message");
-    // let mut snp_count = 0;
-    // let mut ins_count = 0;
-    // let mut del_count = 0;
+    vcf_wrt.write_header(&header).expect("TODO: panic message");
+    let mut snp_count = 0;
+    let mut ins_count = 0;
+    let mut del_count = 0;
     // let _ = final_var_recs.par_iter()
     //     .map(|varrec| vcf_wrt.write_record(&header, varrec).expect("panics"));
-    // for mut rec in final_var_recs {
-        // match rec.info().get(&key::SV_TYPE) {
-        //     Some(value) => {
-        //         if value == Some(&field::Value::String("INS".into())) {
-        //             let new_id = format!("INS{}", ins_count);
-        //             *rec.ids_mut() = new_id.parse().unwrap();
-        //             ins_count += 1;
-        //         } else if value == Some(&field::Value::String("DEL".into())) {
-        //             let new_id = format!("DEL{}", del_count);
-        //             *rec.ids_mut() = new_id.parse().unwrap();
-        //             del_count += 1;
-        //         }
-        //     }
-        //     None => {
-        //         let new_id = format!("SNP{}", snp_count);
-        //         *rec.ids_mut() = new_id.parse().unwrap();
-        //         snp_count += 1;
-        //     }
-        // }
+    for mut rec in final_var_recs {
+        match rec.info().get(&key::SV_TYPE) {
+            Some(value) => {
+                if value == Some(&field::Value::String("INS".into())) {
+                    let new_id = format!("INS{}", ins_count);
+                    *rec.ids_mut() = new_id.parse().unwrap();
+                    ins_count += 1;
+                } else if value == Some(&field::Value::String("DEL".into())) {
+                    let new_id = format!("DEL{}", del_count);
+                    *rec.ids_mut() = new_id.parse().unwrap();
+                    del_count += 1;
+                }
+            }
+            None => {
+                let new_id = format!("SNP{}", snp_count);
+                *rec.ids_mut() = new_id.parse().unwrap();
+                snp_count += 1;
+            }
+        }
 
-    //     vcf_wrt
-    //         .write_record(&header, &rec)
-    //         .expect("TODO: panic message");
-    // }
+        vcf_wrt
+            .write_record(&header, &rec)
+            .expect("TODO: panic message");
+    }
 }
 
 fn get_variant_rec(
