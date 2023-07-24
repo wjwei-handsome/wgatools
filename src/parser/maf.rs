@@ -22,7 +22,7 @@ pub struct MAFReader<R: Read> {
 
 impl<R> MAFReader<R>
 where
-    R: Read+Send,
+    R: Read + Send,
 {
     /// Create a new PAF parser
     pub fn new(reader: R) -> Self {
@@ -191,12 +191,12 @@ impl Default for MAFRecord {
 
 /// A MAF record iterator
 /// two s-lines should be a record
-pub struct MAFRecords<'a, R: Read+Send> {
+pub struct MAFRecords<'a, R: Read + Send> {
     inner: &'a mut BufReader<R>,
 }
 
 /// impl Iterator trait for MAFRecords
-impl<R: Read+Send> Iterator for MAFRecords<'_, R> {
+impl<R: Read + Send> Iterator for MAFRecords<'_, R> {
     type Item = Result<MAFRecord, ParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -318,47 +318,47 @@ impl AlignRecord for MAFRecord {
         }
     }
 
-    fn convert2bam(&self, name_id_map: &HashMap<&str, u64>) -> SamRecord {
-        // init a bam record
-        let mut bamrec = SamRecord::default();
-
-        // set bam record query name
-        let q_name = self.query_name();
-        let q_name: ReadName = q_name.parse().unwrap(); // TODO: handle parse error
-        *bamrec.read_name_mut() = Some(q_name);
-
-        // set bam record flags: it always in empty in whole genome alignment
-        *bamrec.flags_mut() = Flags::empty();
-
-        // set bam record reference sequence id ref to name-id-map
-        let t_name = self.target_name();
-        let t_id = *name_id_map.get(t_name).unwrap();
-        *bamrec.reference_sequence_id_mut() = Some(t_id as usize);
-
-        // set bam record position
-        let t_start = self.target_start() + 1; // 0-based to 1-based
-        *bamrec.alignment_start_mut() = Position::new(t_start as usize);
-
-        // set bam record cigar
-        let gen_cigar = parse_maf_seq_to_cigar(self, false);
-        let cigar: Cigar = gen_cigar.cigar_string.parse().unwrap();
-        *bamrec.cigar_mut() = cigar;
-
-        // set bam record sequence
-        let mut q_seq_ref = self.query_seq().to_string();
-        q_seq_ref.retain(|c| c != '-'); // remove gap;should be UPPER?
-        let q_seq: Sequence = q_seq_ref.parse().unwrap();
-        *bamrec.sequence_mut() = q_seq;
-
-        // set bam record tags
-        let edit_dist = gen_cigar.mismatch_count + gen_cigar.ins_count + gen_cigar.del_count;
-        let nm_tag = String::from("NM:i:") + &*edit_dist.to_string();
-        let tag: Data = nm_tag.parse().unwrap();
-        *bamrec.data_mut() = tag;
-
-        // return bam record
-        bamrec
-    }
+    // fn convert2bam(&self, name_id_map: &HashMap<&str, u64>) -> SamRecord {
+    //     // init a bam record
+    //     let mut bamrec = SamRecord::default();
+    //
+    //     // set bam record query name
+    //     let q_name = self.query_name();
+    //     let q_name: ReadName = q_name.parse().unwrap(); // TODO: handle parse error
+    //     *bamrec.read_name_mut() = Some(q_name);
+    //
+    //     // set bam record flags: it always in empty in whole genome alignment
+    //     *bamrec.flags_mut() = Flags::empty();
+    //
+    //     // set bam record reference sequence id ref to name-id-map
+    //     let t_name = self.target_name();
+    //     let t_id = *name_id_map.get(t_name).unwrap();
+    //     *bamrec.reference_sequence_id_mut() = Some(t_id as usize);
+    //
+    //     // set bam record position
+    //     let t_start = self.target_start() + 1; // 0-based to 1-based
+    //     *bamrec.alignment_start_mut() = Position::new(t_start as usize);
+    //
+    //     // set bam record cigar
+    //     let gen_cigar = parse_maf_seq_to_cigar(self, true);
+    //     let cigar: Cigar = gen_cigar.bamcigar;
+    //     *bamrec.cigar_mut() = cigar;
+    //
+    //     // set bam record sequence
+    //     let mut q_seq_ref = self.query_seq().to_string();
+    //     q_seq_ref.retain(|c| c != '-'); // remove gap;should be UPPER?
+    //     let q_seq: Sequence = q_seq_ref.parse().unwrap();
+    //     *bamrec.sequence_mut() = q_seq;
+    //
+    //     // set bam record tags
+    //     let edit_dist = gen_cigar.mismatch_count + gen_cigar.ins_count + gen_cigar.del_count;
+    //     let nm_tag = String::from("NM:i:") + &*edit_dist.to_string();
+    //     let tag: Data = nm_tag.parse().unwrap();
+    //     *bamrec.data_mut() = tag;
+    //
+    //     // return bam record
+    //     bamrec
+    // }
 
     fn query_seq(&self) -> &str {
         &self.slines[1].seq
