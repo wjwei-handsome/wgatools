@@ -6,7 +6,7 @@ use std::io;
 use std::io::Write;
 
 /// Convert a MAF Reader to output a Chain file
-pub fn maf2chain<R: io::Read+Send>(pafreader: &mut MAFReader<R>, outputpath: &str) {
+pub fn maf2chain<R: io::Read + Send>(pafreader: &mut MAFReader<R>, outputpath: &str) {
     // init writer
     let mut writer = output_writer(outputpath);
 
