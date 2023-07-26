@@ -1,5 +1,5 @@
 use crate::errors::ParseError;
-use crate::parser::chain::ChainDataLine;
+use crate::parser::chain::{ChainDataLine, ChainRecord};
 use crate::parser::common::{AlignRecord, Block};
 use csv::Writer;
 use itertools::Itertools;
@@ -10,11 +10,6 @@ use nom::multi::fold_many0;
 use nom::IResult;
 use std::io::Write;
 use std::str;
-// use noodles_sam::record::Cigar as SamCigar;
-// use noodles_sam::record::cigar::Op;
-// use noodles_sam::record::cigar::op::Kind::{Deletion, HardClip, Insertion, Match};
-// use rayon::prelude::*;
-use rust_htslib::bam::record::{Cigar as BamCigar, CigarString};
 
 /// CigarUnit is a atom operation in cigar string
 #[derive(Debug)]
@@ -170,7 +165,7 @@ pub fn cigar_cat(c1: &char, c2: &char) -> char {
 
 pub struct Cigar {
     pub cigar_string: String,
-    pub bamcigar: CigarString,
+    // pub bamcigar: CigarString,
     pub match_count: usize,
     pub ins_count: usize,
     pub del_count: usize,
@@ -193,11 +188,9 @@ pub fn parse_maf_seq_to_cigar<T: AlignRecord>(rec: &T, with_h: bool) -> Cigar {
 
     let begin = rec.query_start() as usize;
     let end = rec.query_length() - rec.query_end();
-    let mut bamcigar = Vec::new();
     if with_h {
         cigar_string.push_str(&begin.to_string());
         cigar_string.push('H');
-        bamcigar.push(BamCigar::HardClip(begin as u32));
     }
 
     let mut result_len = 0;
@@ -213,24 +206,20 @@ pub fn parse_maf_seq_to_cigar<T: AlignRecord>(rec: &T, with_h: bool) -> Cigar {
                 if result_len != 0 {
                     cigar_string.push_str(&result_len.to_string());
                     cigar_string.push('M');
-                    bamcigar.push(BamCigar::Match(result_len as u32));
                 }
                 ins_count += len;
                 cigar_string.push_str(&len.to_string());
                 cigar_string.push(k);
-                bamcigar.push(BamCigar::Ins(len as u32));
                 result_len = 0;
             }
             'D' => {
                 if result_len != 0 {
                     cigar_string.push_str(&result_len.to_string());
                     cigar_string.push('M');
-                    bamcigar.push(BamCigar::Match(result_len as u32));
                 }
                 del_count += len;
                 cigar_string.push_str(&len.to_string());
                 cigar_string.push(k);
-                bamcigar.push(BamCigar::Del(len as u32));
                 result_len = 0;
             }
             'X' => {
@@ -242,19 +231,14 @@ pub fn parse_maf_seq_to_cigar<T: AlignRecord>(rec: &T, with_h: bool) -> Cigar {
     }
     cigar_string.push_str(&result_len.to_string());
     cigar_string.push('M');
-    bamcigar.push(BamCigar::Match(result_len as u32));
 
     if with_h {
         cigar_string.push_str(&end.to_string());
         cigar_string.push('H');
-        bamcigar.push(BamCigar::HardClip(end as u32));
     }
-
-    let bamcigar = CigarString(bamcigar);
 
     Cigar {
         cigar_string,
-        bamcigar,
         match_count,
         ins_count,
         del_count,
@@ -356,4 +340,46 @@ pub fn parse_cigar_to_insert<'a, T: AlignRecord>(
         };
     })(cigar)?;
     Ok((rest, res))
+}
+
+/// parse ChainRecord into Cigar
+pub fn parse_chain_to_cigar(rec: &ChainRecord, _with_h: bool) -> Cigar {
+    let mut cigar_string = String::new();
+    let mut match_count = 0;
+    let mut ins_count = 0;
+    let mut del_count = 0;
+    let mismatch_count = 0;
+    let mut current_offset = 0;
+    for dataline in &rec.lines {
+        let match_len = dataline.size - current_offset;
+        let ins_len = dataline.target_diff;
+        let del_len = dataline.query_diff;
+        cigar_string.push_str(&match_len.to_string());
+        cigar_string.push('M');
+        match_count += match_len as usize;
+        match ins_len {
+            0 => {}
+            _ => {
+                cigar_string.push_str(&ins_len.to_string());
+                cigar_string.push('I');
+                ins_count += ins_len as usize;
+            }
+        };
+        match del_len {
+            0 => {}
+            _ => {
+                cigar_string.push_str(&del_len.to_string());
+                cigar_string.push('D');
+                del_count += del_len as usize
+            }
+        }
+        current_offset = dataline.size;
+    }
+    Cigar {
+        cigar_string,
+        match_count,
+        mismatch_count,
+        ins_count,
+        del_count,
+    }
 }
