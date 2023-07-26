@@ -1,15 +1,10 @@
-use crate::converter::maf2bam::maf2bam;
 use crate::converter::maf2chain::maf2chain;
 use crate::converter::maf2paf::maf2paf;
 use crate::errors::ParseError;
 use crate::parser::cigar::parse_maf_seq_to_cigar;
 use crate::parser::common::{AlignRecord, FileFormat, Strand};
 use crate::parser::paf::PafRecord;
-use noodles_core::Position;
-use noodles_sam::alignment::Record as SamRecord;
-use noodles_sam::record::{Cigar, Data, Flags, ReadName, Sequence};
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader, Read};
@@ -56,9 +51,9 @@ where
             FileFormat::Chain => {
                 maf2chain(self, outputpath);
             }
-            FileFormat::Bam => {
-                maf2bam(self, outputpath);
-            }
+            // FileFormat::Bam => {
+            //     maf2bam(self, outputpath);
+            // }
             FileFormat::Paf => {
                 maf2paf(self, outputpath);
             }
