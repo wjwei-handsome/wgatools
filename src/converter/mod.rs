@@ -1,3 +1,4 @@
+pub(crate) mod chain2paf;
 pub(crate) mod maf2bam;
 pub(crate) mod maf2chain;
 pub(crate) mod maf2paf;
