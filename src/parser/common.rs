@@ -4,6 +4,7 @@ use noodles_sam::alignment::Record as SamRecord;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
+use std::str::FromStr;
 
 /// Enum the file types
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -38,6 +39,18 @@ pub enum Strand {
     Positive,
     #[serde(rename = "-")]
     Negative,
+}
+
+impl FromStr for Strand {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "+" => Ok(Strand::Positive),
+            "-" => Ok(Strand::Negative),
+            _ => Err(format!("Invalid strand character: {}", s)),
+        }
+    }
 }
 
 impl From<char> for Strand {
