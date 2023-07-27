@@ -31,14 +31,6 @@ where
     }
 
     /// Iterate over the records in the MAF file
-    /// ```
-    ///use wgalib::parser::maf::MAFReader;
-    /// let mut reader = MAFReader::from_path("data/test.maf").unwrap();
-    ///for record in reader.records() {
-    ///    let record = record.unwrap();
-    ///    println!("{:?}", record);
-    ///}
-    /// ```
     pub fn records(&mut self) -> MAFRecords<R> {
         MAFRecords {
             inner: self.inner.by_ref(),
