@@ -1,4 +1,4 @@
-pub(crate) mod chain;
+pub mod chain;
 pub(crate) mod cigar;
 pub mod common;
 pub mod maf;
