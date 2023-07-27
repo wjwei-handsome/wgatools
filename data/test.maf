@@ -1,6 +1,0 @@
-##maf version=1.0
-
-a score=222
-s t1 15 17 + 30      GGGAGC--CA-DDT-CATTTT
-s q1 10 17 + 30      G--AGCIICAI--TGCATTTT
-
