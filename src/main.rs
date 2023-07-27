@@ -1,30 +1,38 @@
-use wgalib::caller::test_call;
-use wgalib::parser::common::FileFormat;
-use wgalib::parser::maf::MAFReader;
-// use wgalib::parser::paf::PAFReader;
+use wgalib::cli::{make_cli_parse, Commands};
+use wgalib::log::init_logger;
+use wgalib::utils::{chain2maf, chain2paf, maf2chain, maf2paf, paf2chain, paf2maf};
 
 fn main() {
-    // let mut reader = MAFReader::from_path("data/test.maf").unwrap();
-    // let _header = &reader.header;
-    // reader.convert("tiny.bam", FileFormat::Bam);
-    // let mut reader = MAFReader::from_path("/Users/wjwei/NAM2B73v5.Zm-CML333__TO__Zm-B73v5.maf").unwrap();
-    // let _header = &reader.header;
-    // reader.convert("test-out.paf", FileFormat::Paf);
-    // let mut reader = MAFReader::from_path("data/test.maf").unwrap();
-    // let _header = &reader.header;
-    // reader.convert("tiny.chain", FileFormat::Chain);
+    init_logger();
 
-    // let mut reader = PAFReader::from_path("/Users/wjwei/Zm-CML333.paf").unwrap();
-    // reader.convert("test.chain", FileFormat::Chain);
-    // let mut reader = PAFReader::from_path("/Users/wjwei/Zm-CML333.paf").unwrap();
-    // reader.convert("tes.blocks", FileFormat::Blocks);
-    // let mut reader = PAFReader::from_path("test.paf").unwrap();
-    // reader.convert(
-    //     "test-out.maf",
-    //     FileFormat::Maf,
-    //     Some("/Users/wjwei/Zm-B73v5.genome.fa"),
-    //     Some("/Users/wjwei/Zm-CML333.genome.fa"),
-    // );
+    let cli = make_cli_parse();
 
-    test_call();
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(cli.threads)
+        .build_global()
+        .unwrap(); // TODO: handle threadpool error
+
+    let outfile = cli.outfile;
+    let rewrite = cli.rewrite;
+
+    match &cli.command {
+        Commands::Maf2Paf { input } => {
+            maf2paf(input, &outfile, rewrite);
+        }
+        Commands::Paf2Maf {
+            input,
+            target,
+            query,
+        } => {
+            paf2maf(input, &outfile, target, query, rewrite);
+        }
+        Commands::Paf2Chain { input } => paf2chain(input, &outfile, rewrite),
+        Commands::Chain2Paf { input } => chain2paf(input, &outfile, rewrite),
+        Commands::Chain2Maf {
+            input,
+            target,
+            query,
+        } => chain2maf(input, &outfile, target, query, rewrite),
+        Commands::Maf2Chain { input } => maf2chain(input, &outfile, rewrite),
+    }
 }
