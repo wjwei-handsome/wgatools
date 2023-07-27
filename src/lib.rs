@@ -2,4 +2,6 @@ pub mod caller;
 pub mod converter;
 pub mod errors;
 pub mod parser;
-mod utils;
+pub mod utils;
+pub mod cli;
+pub mod log;
