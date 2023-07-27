@@ -5,7 +5,7 @@ use rust_htslib::faidx;
 use std::io;
 
 /// Convert a Chain Reader to output a MAF file
-pub fn chain2maf<R: io::Read+Send>(
+pub fn chain2maf<R: io::Read + Send>(
     chainreader: &mut ChainReader<R>,
     outputpath: &str,
     t_fa_path: Option<&str>,
@@ -60,7 +60,7 @@ pub fn chain2maf<R: io::Read+Send>(
                     "s\t{}\t{}\t{}\t{}\t{}\t",
                     t_name, t_start, t_alilen, t_strand, t_size
                 )
-                    .as_bytes(),
+                .as_bytes(),
             )
             .unwrap();
         writer.write_all(whole_t_seq.as_bytes()).unwrap();
@@ -71,7 +71,7 @@ pub fn chain2maf<R: io::Read+Send>(
                     "s\t{}\t{}\t{}\t{}\t{}\t",
                     q_name, q_start, q_alilen, q_strand, q_size
                 )
-                    .as_bytes(),
+                .as_bytes(),
             )
             .unwrap();
         writer.write_all(whole_q_seq.as_bytes()).unwrap();
@@ -93,7 +93,7 @@ fn parse_chain_to_insert(
         let del_len = dataline.query_diff;
         current_offset += match_len;
         match ins_len {
-            0 => {},
+            0 => {}
             _ => {
                 let ins_str = "-".repeat(ins_len as usize);
                 t_seq.insert_str(current_offset as usize, &ins_str);
@@ -101,7 +101,7 @@ fn parse_chain_to_insert(
             }
         }
         match del_len {
-            0 => {},
+            0 => {}
             _ => {
                 let del_str = "-".repeat(del_len as usize);
                 q_seq.insert_str(current_offset as usize, &del_str);

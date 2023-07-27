@@ -2,7 +2,9 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(name = "wgatools")]
-#[command(about = "a cross-platform and ultrafast toolkit for Whole Genome Alignment Files manipulation")]
+#[command(
+    about = "a cross-platform and ultrafast toolkit for Whole Genome Alignment Files manipulation"
+)]
 #[command(long_about = "long_about todo!!!")]
 #[command(author, version)]
 #[command(
@@ -69,10 +71,10 @@ pub enum Commands {
         #[arg(required = false)]
         input: Option<String>,
         /// Input target FASTA File, required
-        #[arg(required = true,long, short)]
+        #[arg(required = true, long, short)]
         target: String,
         /// Input query FASTA File, required
-        #[arg(required = true,long, short)]
+        #[arg(required = true, long, short)]
         query: String,
     },
     /// Convert Chain format to PAF format
@@ -83,8 +85,6 @@ pub enum Commands {
         input: Option<String>,
     },
 }
-
-
 
 pub fn make_cli_parse() -> Cli {
     Cli::parse()

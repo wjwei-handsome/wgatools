@@ -1,3 +1,4 @@
+use crate::converter::chain2maf::chain2maf;
 use crate::converter::chain2paf::chain2paf;
 use crate::errors::ParseError;
 use crate::parser::cigar::parse_chain_to_cigar;
@@ -12,7 +13,6 @@ use nom::IResult;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::{fmt, io};
-use crate::converter::chain2maf::chain2maf;
 
 /// Reader for MAF file format
 pub struct ChainReader<R: Read> {
