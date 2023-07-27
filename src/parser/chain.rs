@@ -12,6 +12,7 @@ use nom::IResult;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::{fmt, io};
+use crate::converter::chain2maf::chain2maf;
 
 /// Reader for MAF file format
 pub struct ChainReader<R: Read> {
@@ -37,12 +38,20 @@ where
     }
 
     /// convert method
-    pub fn convert(&mut self, outputpath: &str, format: FileFormat) {
+    pub fn convert(
+        &mut self,
+        outputpath: &str,
+        format: FileFormat,
+        t_fa_path: Option<&str>,
+        q_fa_path: Option<&str>,
+    ) {
         match format {
             FileFormat::Paf => {
                 chain2paf(self, outputpath);
             }
-            FileFormat::Maf => {}
+            FileFormat::Maf => {
+                chain2maf(self, outputpath, t_fa_path, q_fa_path);
+            }
             _ => {}
         }
     }
