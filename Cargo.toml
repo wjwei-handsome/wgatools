@@ -2,18 +2,20 @@
 name = "wgatools"
 version = "0.1.0"
 edition = "2021"
+authors = ["Wenjie Wei <wjwei9908@gmail.com>",]
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+atty = "0.2.14"
 clap = { version = "4.3.16", features = ["derive"] }
 csv = "1.2.2"
 itertools = "0.11.0"
+log = "0.4.19"
+log4rs = "1.2.0"
 natord = "1.0.9"
 nom = "7.1.3"
-noodles-bam = "0.38.0"
-noodles-core = "0.12.0"
-noodles-sam = "0.35.0"
 noodles-vcf = "0.34.0"
 rayon = "1.7.0"
 rust-htslib = "0.44.1"
