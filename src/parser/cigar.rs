@@ -286,7 +286,7 @@ fn cigar_unit_chain(
                 wtr.write_all(format!("{}", dataline).as_bytes())?;
             };
             // accumulate size
-            dataline.size += count;
+            dataline.size = count;
             // init query&target diff
             dataline.target_diff = 0;
             dataline.query_diff = 0;
