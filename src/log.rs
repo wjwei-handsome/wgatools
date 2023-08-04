@@ -6,8 +6,13 @@ use log4rs::{
     filter::threshold::ThresholdFilter,
 };
 
-pub fn init_logger() {
-    let log_level = LevelFilter::Info;
+pub fn init_logger(verbose: u8) {
+    let log_level = match verbose {
+        0 => LevelFilter::Off,
+        1 => LevelFilter::Trace,
+        2 => LevelFilter::Debug,
+        _ => LevelFilter::Info,
+    };
     // Build a stderr logger.
     let log_stderr = ConsoleAppender::builder()
         .target(Target::Stderr)

@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use clap::ArgAction;
 
 #[derive(Parser)]
 #[command(name = "wgatools")]
@@ -20,15 +21,18 @@ pub struct Cli {
     /// Bool, if rewrite output file [default: false]
     #[arg(long, short, global = true, default_value = "false", help_heading = Some("GLOBAL"))]
     pub rewrite: bool,
-    // Threads, default 1
+    /// Threads, default 1
     #[arg(long, short, global = true, default_value = "1", help_heading = Some("GLOBAL"))]
     pub threads: usize,
+    /// Logging level [-v: Info, -vv: Debug, -vvv: Trace].
+    #[arg(short, long, global = true, action = ArgAction::Count, help_heading = "GLOBAL")]
+    pub verbose: u8,
     /// Subcommands
     #[command(subcommand)]
     pub command: Commands,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Convert MAF format to PAF format
     #[command(visible_alias = "m2p", name = "maf2paf")]

@@ -1,11 +1,13 @@
+use log::info;
 use wgalib::cli::{make_cli_parse, Commands};
 use wgalib::log::init_logger;
 use wgalib::utils::{chain2maf, chain2paf, maf2chain, maf2paf, paf2chain, paf2maf};
 
 fn main() {
-    init_logger();
-
     let cli = make_cli_parse();
+    let verbose = cli.verbose;
+
+    init_logger(verbose);
 
     rayon::ThreadPoolBuilder::new()
         .num_threads(cli.threads)
@@ -14,6 +16,9 @@ fn main() {
 
     let outfile = cli.outfile;
     let rewrite = cli.rewrite;
+
+    // Info log
+    info!("Process: {:?}", &cli.command);
 
     match &cli.command {
         Commands::Maf2Paf { input } => {
