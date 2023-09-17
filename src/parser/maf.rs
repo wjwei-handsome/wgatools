@@ -8,6 +8,7 @@ use std::cmp::Ordering;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader, Read};
+use log::warn;
 
 /// Parser for MAF file format
 pub struct MAFReader<R: Read> {
@@ -24,6 +25,9 @@ where
         let mut buf_reader = BufReader::new(reader);
         let mut header = String::new();
         buf_reader.read_line(&mut header).unwrap();
+        if !header.starts_with("#") {
+            warn!("MAF Header is not start with `#`")
+        }
         MAFReader {
             inner: buf_reader,
             header,
