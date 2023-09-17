@@ -88,6 +88,13 @@ pub enum Commands {
         #[arg(required = false)]
         input: Option<String>,
     },
+    /// Extract specific region from MAF format
+    #[command(visible_alias = "me", name = "maf-ext")]
+    MafExtract {
+        /// Input MAF File, None for STDIN
+        #[arg(required = false)]
+        input: Option<String>,
+    },
 }
 
 pub fn make_cli_parse() -> Cli {

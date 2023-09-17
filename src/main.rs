@@ -2,6 +2,7 @@ use log::info;
 use wgalib::cli::{make_cli_parse, Commands};
 use wgalib::log::init_logger;
 use wgalib::utils::{chain2maf, chain2paf, maf2chain, maf2paf, paf2chain, paf2maf};
+use wgalib::tools::mafextra::maf_extractor;
 
 fn main() {
     let cli = make_cli_parse();
@@ -39,5 +40,8 @@ fn main() {
             query,
         } => chain2maf(input, &outfile, target, query, rewrite),
         Commands::Maf2Chain { input } => maf2chain(input, &outfile, rewrite),
+        Commands::MafExtract { input } => {
+            maf_extractor();
+        }
     }
 }
