@@ -1,5 +1,5 @@
-use clap::{Parser, Subcommand};
 use clap::ArgAction;
+use clap::{command, Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(name = "wgatools")]
@@ -94,6 +94,33 @@ pub enum Commands {
         /// Input MAF File, None for STDIN
         #[arg(required = false)]
         input: Option<String>,
+        /// Input regions
+        #[arg(required = false, long, short, value_delimiter = ',')]
+        regions: Option<Vec<String>>,
+        /// Input regions file
+        #[arg(required = false, long, short)]
+        file: Option<String>,
+    },
+    /// Call Variants from MAF file
+    #[command(visible_alias = "c", name = "call")]
+    Call {
+        /// Input MAF File, None for STDIN
+        #[arg(required = false)]
+        input: Option<String>,
+    },
+    /// TEST: maf2sam
+    #[command(visible_alias = "m2s", name = "maf2sam")]
+    Maf2Sam {
+        /// Input MAF File, None for STDIN
+        #[arg(required = false)]
+        input: Option<String>,
+    },
+    /// TEST: maf-index
+    #[command(visible_alias = "mi", name = "maf-index")]
+    MafIndex {
+        /// Input MAF File, None for STDIN
+        #[arg(required = true)]
+        input: String,
     },
 }
 

@@ -1,8 +1,11 @@
 use log::info;
 use wgalib::cli::{make_cli_parse, Commands};
 use wgalib::log::init_logger;
-use wgalib::utils::{chain2maf, chain2paf, maf2chain, maf2paf, paf2chain, paf2maf};
-use wgalib::tools::mafextra::maf_extractor;
+use wgalib::tools::caller::maf_call;
+use wgalib::utils::{
+    chain2maf, chain2paf, maf2chain, maf2paf, maf2sam, paf2chain, paf2maf, wrap_build_index,
+    wrap_maf_extract,
+};
 
 fn main() {
     let cli = make_cli_parse();
@@ -19,7 +22,7 @@ fn main() {
     let rewrite = cli.rewrite;
 
     // Info log
-    info!("Process: {:?}", &cli.command);
+    // info!("Process: {:?}", &cli.command);
 
     match &cli.command {
         Commands::Maf2Paf { input } => {
@@ -40,8 +43,21 @@ fn main() {
             query,
         } => chain2maf(input, &outfile, target, query, rewrite),
         Commands::Maf2Chain { input } => maf2chain(input, &outfile, rewrite),
-        Commands::MafExtract { input } => {
-            maf_extractor();
+        Commands::MafExtract {
+            input,
+            regions,
+            file,
+        } => {
+            wrap_maf_extract(input, regions, file, &outfile, rewrite);
         }
+        Commands::Call { input } => {
+            println!("Call: {:?}", input);
+            maf_call();
+        }
+        Commands::Maf2Sam { input } => {
+            println!("maf2sam: {:?}", input);
+            maf2sam(input, &outfile, rewrite)
+        }
+        Commands::MafIndex { input } => wrap_build_index(input, &outfile),
     }
 }

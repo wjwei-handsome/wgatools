@@ -2,7 +2,9 @@ use crate::parser::chain::ChainReader;
 use crate::parser::common::FileFormat;
 use crate::parser::maf::MAFReader;
 use crate::parser::paf::PAFReader;
-use log::{error, warn};
+use crate::tools::index::{build_index, MafIndex};
+use crate::tools::mafextra::maf_extract_idx;
+use log::{error, info, warn};
 use std::error::Error;
 use std::fs::File;
 use std::io::{stdin, stdout, BufRead, BufReader, BufWriter, Stdin, Write};
@@ -13,7 +15,7 @@ type DynResult<T> = Result<T, Box<dyn Error + 'static>>;
 const BUFFER_SIZE: usize = 32 * 1024;
 
 /// rational stdin reader: if stdin is empty, exit with error
-fn stdin_reader() -> Stdin {
+pub fn stdin_reader() -> Stdin {
     // check if stdin is empty
     if atty::is(atty::Stream::Stdin) {
         error!("no input content detected");
@@ -24,7 +26,7 @@ fn stdin_reader() -> Stdin {
 }
 
 /// Get a buffer-read input reader from stdin or a file
-fn get_input_reader(input: &Option<String>) -> DynResult<Box<dyn BufRead + Send + 'static>> {
+pub fn get_input_reader(input: &Option<String>) -> DynResult<Box<dyn BufRead + Send + 'static>> {
     let reader: Box<dyn BufRead + Send + 'static> = match input {
         Some(path) => {
             if path == "-" {
@@ -77,10 +79,34 @@ pub fn convert(
     rewrite: bool,
 ) {
     outfile_exist(output, rewrite);
-    let reader = get_input_reader(input).expect("Error: cannot read input file");
+
+    let input_name = match input {
+        Some(path) => path,
+        None => "stdin",
+    };
+
+    let output_name = match output.as_str() {
+        "-" => "stdout",
+        path => path,
+    };
+
+    let reader = match get_input_reader(input) {
+        Ok(reader) => reader,
+        Err(why) => {
+            error!("Input Error: {} in {}", why, input_name);
+            std::process::exit(1);
+        }
+    };
+
+    info!("start read {:?} file: {}", in_format, input_name);
+
     match in_format {
         FileFormat::Maf => {
             let mut mafreader = MAFReader::new(reader);
+            info!(
+                "start convert {:?} file into {:?}: {}",
+                in_format, out_format, output_name
+            );
             mafreader.convert(output, out_format);
         }
         FileFormat::Paf => {
@@ -190,4 +216,101 @@ pub fn chain2paf(input: &Option<String>, output: &String, rewrite: bool) {
         &None,
         rewrite,
     );
+}
+
+/// Command: maf2sam
+pub fn maf2sam(input: &Option<String>, output: &String, rewrite: bool) {
+    convert(
+        FileFormat::Maf,
+        FileFormat::Sam,
+        input,
+        output,
+        &None,
+        &None,
+        rewrite,
+    );
+}
+
+/// Command: build maf index
+pub fn wrap_build_index(input: &String, outputpath: &str) {
+    let outputpath = match outputpath {
+        "-" => {
+            // add .idx suffix to input file
+            let mut path = input.clone();
+            path.push_str(".index");
+            path
+        }
+        path => path.to_owned(),
+    };
+
+    let mut mafreader = MAFReader::from_path(input).unwrap();
+    // // init index-writer and csv-writer for deserializing
+    // let mut idx_wtr = csv::WriterBuilder::new()
+    //     .delimiter(b'\t')
+    //     .has_headers(false)
+    //     .from_writer(output_writer(&outputpath));
+    // init index-writer
+    let idx_wtr = output_writer(&outputpath);
+    build_index(&mut mafreader, idx_wtr)
+}
+
+/// Command: maf extract
+pub fn wrap_maf_extract(
+    input: &Option<String>,
+    regions: &Option<Vec<String>>,
+    region_file: &Option<String>,
+    output: &String,
+    rewrite: bool,
+) {
+    // judge regions and region_file
+    if regions.is_none() && region_file.is_none() {
+        error!("regions or region_file must be specified");
+        std::process::exit(1);
+    }
+
+    outfile_exist(output, rewrite);
+
+    let input_name = match input {
+        Some(path) => path,
+        None => "stdin",
+    };
+
+    let output_name = match output.as_str() {
+        "-" => "stdout",
+        path => path,
+    };
+
+    // let reader = match get_input_reader(input) {
+    //     Ok(reader) => reader,
+    //     Err(why) => {
+    //         error!("Input Error: {} in {}", why, input_name);
+    //         std::process::exit(1);
+    //     }
+    // };
+    // let mut mafreader = MAFReader::new(reader);
+    let mut writer = output_writer(output);
+
+    match input {
+        // if input if from file, use index
+        Some(path) => {
+            let mut mafreader = MAFReader::from_path(path).unwrap();
+            let index_path = format!("{}.index", path);
+            let index_rdr = match File::open(index_path) {
+                Ok(file) => BufReader::new(file),
+                Err(err) => {
+                    warn!(
+                        "failed to open index file: {}, please use `index` to create it; will use iterator to extract",
+                        err
+                    );
+                    // std::process::exit(1);
+                    todo!("use iterator to extract")
+                }
+            };
+            let mafindex: MafIndex = serde_json::from_reader(index_rdr).unwrap();
+            maf_extract_idx(regions, region_file, &mut mafreader, mafindex, &mut writer);
+        }
+        None => {
+            todo!()
+        }
+    }
 }
