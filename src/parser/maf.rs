@@ -1,18 +1,20 @@
+use crate::converter::maf2bam::maf2sam;
 use crate::converter::maf2chain::maf2chain;
 use crate::converter::maf2paf::maf2paf;
 use crate::errors::ParseError;
 use crate::parser::cigar::parse_maf_seq_to_cigar;
 use crate::parser::common::{AlignRecord, FileFormat, Strand};
 use crate::parser::paf::PafRecord;
+use itertools::Itertools;
+use log::warn;
 use std::cmp::Ordering;
 use std::fs::File;
-use std::io;
+use std::io::{self, Write};
 use std::io::{BufRead, BufReader, Read};
-use log::warn;
 
 /// Parser for MAF file format
 pub struct MAFReader<R: Read> {
-    inner: BufReader<R>,
+    pub inner: BufReader<R>,
     pub header: String,
 }
 
@@ -25,7 +27,7 @@ where
         let mut buf_reader = BufReader::new(reader);
         let mut header = String::new();
         buf_reader.read_line(&mut header).unwrap();
-        if !header.starts_with("#") {
+        if !header.starts_with('#') {
             warn!("MAF Header is not start with `#`")
         }
         MAFReader {
@@ -53,6 +55,9 @@ where
             FileFormat::Paf => {
                 maf2paf(self, outputpath);
             }
+            FileFormat::Sam => {
+                maf2sam(self, outputpath);
+            }
             _ => {}
         }
     }
@@ -74,14 +79,53 @@ impl MAFReader<File> {
 // s ref    100 12 + 100000 ---AGC-CAT-CATTTT
 // s contig 0   12 + 12     ---AGC-CAT-CATTTT
 #[derive(Debug, PartialEq, Eq)]
-struct MAFSLine {
+pub struct MAFSLine {
     mode: char,
-    name: String,
-    start: u64,
-    align_size: u64,
+    pub name: String,
+    pub start: u64,
+    pub align_size: u64,
     strand: Strand,
-    size: u64,
+    pub size: u64,
     seq: String,
+}
+
+// impl mut for MAFSLine
+impl MAFSLine {
+    fn get_col_coord(&self, pos: u64) -> u64 {
+        let mut col_coord = 0;
+        let mut flag = 0;
+        // skip '-'
+        for (i, c) in self.seq.chars().enumerate() {
+            if c == '-' {
+                continue;
+            } else {
+                flag += 1;
+                if flag == pos + 1 {
+                    col_coord = i as u64;
+                    break;
+                }
+            }
+        }
+
+        col_coord
+    }
+
+    pub fn set_start(&mut self, start: u64) {
+        self.start = start;
+    }
+    pub fn set_align_size(&mut self, align_size: u64) {
+        self.align_size = align_size;
+    }
+    pub fn set_strand(&mut self, strand: Strand) {
+        self.strand = strand;
+    }
+    pub fn set_size(&mut self, size: u64) {
+        self.size = size;
+    }
+
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
+    }
 }
 
 fn str2u64(s: &str) -> Result<u64, ParseError> {
@@ -146,7 +190,36 @@ fn sline_from_string(value: String) -> Result<MAFSLine, ParseError> {
 #[derive(Debug, PartialEq, Eq)]
 pub struct MAFRecord {
     score: u64,
-    slines: Vec<MAFSLine>,
+    pub slines: Vec<MAFSLine>,
+}
+
+impl MAFRecord {
+    pub fn slice_block(&mut self, cut_start: u64, cut_end: u64, ord: usize) {
+        let sline = &mut self.slines[ord];
+
+        let cut_start_index = cut_start - sline.start;
+        let cut_end_index = cut_end - sline.start;
+
+        sline.set_start(cut_start);
+        sline.set_align_size(cut_end - cut_start);
+
+        let start_coord = sline.get_col_coord(cut_start_index);
+        let end_coord = sline.get_col_coord(cut_end_index);
+        sline.seq = sline.seq[start_coord as usize..end_coord as usize].to_string();
+
+        let mut sline_idx_vec = (0..self.slines.len()).collect::<Vec<usize>>();
+        sline_idx_vec.remove(ord);
+        for sline in sline_idx_vec.iter() {
+            let sline = &mut self.slines[*sline];
+            let new_s_start = sline.start + cut_start_index;
+            sline.set_start(new_s_start);
+            let new_seq = sline.seq[start_coord as usize..end_coord as usize].to_string();
+            let pre_align_size = end_coord - start_coord;
+            let gap_size = new_seq.matches('-').count() as u64;
+            sline.set_align_size(pre_align_size - gap_size);
+            sline.seq = new_seq;
+        }
+    }
 }
 
 // TODO: impl a derive macro for AlignRecord to cmp by target_start and target_name
@@ -366,5 +439,45 @@ impl AlignRecord for MAFRecord {
 
     fn target_seq(&self) -> &str {
         &self.slines[0].seq
+    }
+}
+
+/// A MAF Writer
+pub struct MAFWriter<W>
+where
+    W: Write,
+{
+    inner: W,
+}
+
+impl<W> MAFWriter<W>
+where
+    W: Write,
+{
+    /// Create a new MAF writer
+    pub fn new(inner: W) -> Self {
+        Self { inner }
+    }
+
+    /// write header
+    pub fn write_header(&mut self, header: String) {
+        writeln!(self.inner, "{}", header).unwrap();
+    }
+
+    /// write records
+    pub fn write_record(&mut self, record: &MAFRecord) {
+        // write a-line
+        let a_line = format!("a score={}\n", record.score);
+        write!(self.inner, "{}", a_line).unwrap();
+        for sline in record.slines.iter() {
+            // write s-line
+            let s_line = format!(
+                "s\t{}\t{}\t{}\t{}\t{}\t{}",
+                sline.name, sline.start, sline.align_size, sline.strand, sline.size, sline.seq
+            );
+            writeln!(self.inner, "{}", s_line).unwrap();
+        }
+        // write a empty line
+        writeln!(self.inner).unwrap();
     }
 }
