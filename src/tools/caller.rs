@@ -2,12 +2,11 @@ use crate::parser::cigar::cigar_cat_ext;
 use crate::parser::common::AlignRecord;
 use crate::parser::maf::{MAFReader, MAFRecord};
 use itertools::Itertools;
-use noodles_vcf::header::record::value::map::{Contig, Info};
-use noodles_vcf::record::genotypes::sample::Value;
-use noodles_vcf::record::info::field;
-use noodles_vcf::record::info::field::key;
-use noodles_vcf::record::Genotypes;
-use noodles_vcf::{self as vcf, header::record::value::Map, record::Position, Record};
+use noodles::vcf::header::record::value::map::{Contig, Info};
+use noodles::vcf::record::genotypes::sample::Value;
+use noodles::vcf::record::info::field::key;
+use noodles::vcf::record::Genotypes;
+use noodles::vcf::{self as vcf, header::record::value::Map, record::Position, Record};
 use rayon::prelude::*;
 use std::io::BufWriter;
 
@@ -19,9 +18,8 @@ use std::io::BufWriter;
 /// within alignment: snp | ins | del | tandem expansion | tandem contraction | Repeat expansion | Repeat contraction
 /// between alignment: INS | DEL | Repeat expansion | Repeat contraction
 
-pub fn test_call() {
-    let mut reader =
-        MAFReader::from_path("data/output/test.maf").unwrap();
+pub fn maf_call() {
+    let mut reader = MAFReader::from_path("data/output/test.maf").unwrap();
     let _header = &reader.header;
 
     let mut wrt = BufWriter::new(std::fs::File::create("test.vcf").unwrap());
@@ -69,11 +67,16 @@ pub fn test_call() {
     // println!("var_rec collected");
     // let header = header_builder.build();
     vcf_wrt.write_header(&header).expect("TODO: panic message");
-    let mut snp_count = 0;
-    let mut ins_count = 0;
-    let mut del_count = 0;
-    let _ = final_var_recs.par_iter()
-        .map(|varrec| vcf_wrt.write_record(&header, varrec).expect("panics"));
+    for rec in final_var_recs {
+        vcf_wrt
+            .write_record(&header, &rec)
+            .expect("TODO: panic message");
+    }
+    // let mut snp_count = 0;
+    // let mut ins_count = 0;
+    // let mut del_count = 0;
+    // let _ = final_var_recs.par_iter()
+    //     .map(|varrec| vcf_wrt.write_record(&header, varrec).expect("panics"));
     // for mut rec in final_var_recs {
     //     match rec.info().get(&key::SV_TYPE) {
     //         Some(value) => {
