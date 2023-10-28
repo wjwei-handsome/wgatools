@@ -19,7 +19,7 @@
 - [x] PAF2MAF
 - [x] Chain2MAF
 - [x] Chain2PAF
-- [x] Call Variants from MAF
+- [x] Call Variants from MAF [In Discussion]
 
 ### WHAT WILL DO IN FUTURE
 - [ ] SAM file reader [really need?]
@@ -27,6 +27,8 @@
 - [ ] Visualize genome alignment
 - [ ] Call variants and statistics/visualize them
 - [ ] Local improvement of alignment by re-alignment
+- [ ] MAF -> GAF -> HAL
+- [ ] for BIG MAF, should optimize
 
 ### Install
 
