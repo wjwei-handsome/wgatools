@@ -1,4 +1,3 @@
-use log::info;
 use wgalib::cli::{make_cli_parse, Commands};
 use wgalib::log::init_logger;
 use wgalib::tools::caller::maf_call;

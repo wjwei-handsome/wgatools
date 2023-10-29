@@ -8,8 +8,7 @@ use std::io::{BufReader, Error, Write};
 use super::index::{IvP, MafIndex};
 
 use crate::parser::maf::{MAFReader, MAFWriter};
-use csv::{ReaderBuilder};
-use rayon::prelude::*;
+use csv::ReaderBuilder;
 use std::io::Read;
 use std::io::Seek;
 
@@ -189,6 +188,16 @@ fn read_genome_region<R: Read>(reader: R) -> Result<Vec<GenomeRegion>, csv::Erro
     Ok(regions)
 }
 
+type Iv = Interval<u64, u64>;
+
+fn ivp2iv(ivp: &IvP) -> Iv {
+    Iv {
+        start: ivp.start,
+        stop: ivp.end,
+        val: ivp.offset,
+    }
+}
+
 fn extract_sub_blocks_with_idx<R: Read + Send + Seek, W: Write>(
     mafidx: MafIndex,
     regions: Vec<GenomeRegion>,
@@ -196,11 +205,12 @@ fn extract_sub_blocks_with_idx<R: Read + Send + Seek, W: Write>(
     mafwriter: &mut MAFWriter<W>,
 ) {
     let stderr = std::io::stderr();
+    // TODO: parallel genearte sub-maf-blocks
     for givl in regions.iter() {
         match mafidx.get(&givl.name) {
             Some(item) => {
                 let hit_ivps = &item.ivls;
-                let hit_givls = hit_ivps.iter().map(IvP2Iv).collect::<Vec<Iv>>();
+                let hit_givls = hit_ivps.iter().map(ivp2iv).collect::<Vec<Iv>>();
                 let lapper = Lapper::new(hit_givls);
                 let find = lapper.find(givl.start, givl.end).collect::<Vec<&Iv>>();
                 let find_num = find.len();
@@ -251,15 +261,5 @@ fn extract_sub_blocks_with_idx<R: Read + Send + Seek, W: Write>(
                 continue;
             }
         };
-    }
-}
-
-type Iv = Interval<u64, u64>;
-
-fn IvP2Iv(ivp: &IvP) -> Iv {
-    Iv {
-        start: ivp.start,
-        stop: ivp.end,
-        val: ivp.offset,
     }
 }
