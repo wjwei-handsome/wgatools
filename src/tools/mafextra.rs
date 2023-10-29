@@ -6,9 +6,9 @@ use std::fs::File;
 use std::io::{BufReader, Error, Write};
 
 use super::index::{IvP, MafIndex};
-use crate::parser::common::AlignRecord;
-use crate::parser::maf::{MAFReader, MAFRecord, MAFWriter};
-use csv::{DeserializeRecordsIter, ReaderBuilder};
+
+use crate::parser::maf::{MAFReader, MAFWriter};
+use csv::{ReaderBuilder};
 use rayon::prelude::*;
 use std::io::Read;
 use std::io::Seek;
@@ -16,10 +16,10 @@ use std::io::Seek;
 use rust_lapper::{Interval, Lapper};
 
 pub fn maf_extract_iter<R: Read>(
-    regions: &Option<Vec<String>>,
-    region_file: &Option<String>,
-    outputpath: &str,
-    mafreader: &mut MAFReader<R>,
+    _regions: &Option<Vec<String>>,
+    _region_file: &Option<String>,
+    _outputpath: &str,
+    _mafreader: &mut MAFReader<R>,
 ) {
     todo!()
 }

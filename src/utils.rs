@@ -270,12 +270,12 @@ pub fn wrap_maf_extract(
 
     outfile_exist(output, rewrite);
 
-    let input_name = match input {
+    let _input_name = match input {
         Some(path) => path,
         None => "stdin",
     };
 
-    let output_name = match output.as_str() {
+    let _output_name = match output.as_str() {
         "-" => "stdout",
         path => path,
     };

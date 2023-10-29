@@ -5,7 +5,7 @@ use crate::errors::ParseError;
 use crate::parser::cigar::parse_maf_seq_to_cigar;
 use crate::parser::common::{AlignRecord, FileFormat, Strand};
 use crate::parser::paf::PafRecord;
-use itertools::Itertools;
+
 use log::warn;
 use std::cmp::Ordering;
 use std::fs::File;

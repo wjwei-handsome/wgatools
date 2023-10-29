@@ -1,23 +1,22 @@
-use crate::parser::common::AlignRecord;
-use crate::parser::maf::{MAFReader, MAFRecord, MAFRecords};
+
+use crate::parser::maf::{MAFReader};
 use crate::utils::output_writer;
 use noodles::sam::header::record::value::map;
 use noodles::sam::header::record::value::map::header::SortOrder;
 use noodles::sam::record::ReadName;
 use noodles::sam::{
     self as sam,
-    alignment::Record,
     header::record::value::{
         map::{Program, ReferenceSequence},
         Map,
     },
 };
-use rayon::prelude::*;
-use std::collections::HashMap;
+
+
 use std::io;
 use std::num::NonZeroUsize;
 
-use crate::parser::cigar::parse_maf_seq_to_cigar;
+
 
 /// Convert a MAF Reader to output a BAM file
 // pub fn maf2bam<R: io::Read + Send>(mafreader: &mut MAFReader<R>, outputpath: &str) {
@@ -87,7 +86,7 @@ use crate::parser::cigar::parse_maf_seq_to_cigar;
 //     });
 // }
 
-pub fn maf2sam<R: io::Read + Send>(mafreader: &mut MAFReader<R>, outputpath: &str) {
+pub fn maf2sam<R: io::Read + Send>(_mafreader: &mut MAFReader<R>, outputpath: &str) {
     let writer = output_writer(outputpath);
     let mut sam_writer = sam::Writer::new(writer);
     let mut header = Map::<map::Header>::default();
