@@ -280,14 +280,6 @@ pub fn wrap_maf_extract(
         path => path,
     };
 
-    // let reader = match get_input_reader(input) {
-    //     Ok(reader) => reader,
-    //     Err(why) => {
-    //         error!("Input Error: {} in {}", why, input_name);
-    //         std::process::exit(1);
-    //     }
-    // };
-    // let mut mafreader = MAFReader::new(reader);
     let mut writer = output_writer(output);
 
     match input {
@@ -299,7 +291,7 @@ pub fn wrap_maf_extract(
                 Ok(file) => BufReader::new(file),
                 Err(err) => {
                     warn!(
-                        "failed to open index file: {}, please use `index` to create it; will use iterator to extract",
+                        "failed to open index file: {}, please use `maf-index` to create it; will use iterator to extract",
                         err
                     );
                     // std::process::exit(1);
@@ -310,7 +302,7 @@ pub fn wrap_maf_extract(
             maf_extract_idx(regions, region_file, &mut mafreader, mafindex, &mut writer);
         }
         None => {
-            todo!()
+            todo!("use iterator to extract")
         }
     }
 }

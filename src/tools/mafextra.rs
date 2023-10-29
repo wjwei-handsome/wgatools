@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::{max, min};
 use std::fmt::Display;
 use std::fs::File;
-use std::io::{BufReader, Write};
+use std::io::{BufReader, Error, Write};
 
 use super::index::{IvP, MafIndex};
 use crate::parser::common::AlignRecord;
@@ -54,7 +54,14 @@ fn get_input_regions(
     // read input region_vec
     if let Some(regions) = regions {
         for region in regions {
-            input_regions.push(GenomeRegion::from(region.to_string()));
+            let genome_region = match GenomeRegion::try_from(region.to_string()) {
+                Ok(genome_region) => genome_region,
+                Err(err) => {
+                    error!("region format error: {} in {}", err, region);
+                    std::process::exit(1);
+                }
+            };
+            input_regions.push(genome_region);
         }
     }
 
@@ -89,18 +96,71 @@ struct GenomeRegion {
     end: u64,
 }
 
-impl From<String> for GenomeRegion {
-    fn from(s: String) -> Self {
-        let mut iter = s.split(':');
-        let name = iter.next().unwrap();
-        let mut iter = iter.next().unwrap().split('-');
-        let start = iter.next().unwrap().parse::<u64>().unwrap();
-        let end = iter.next().unwrap().parse::<u64>().unwrap();
-        GenomeRegion {
-            name: name.to_string(),
-            start,
-            end,
+impl TryFrom<String> for GenomeRegion {
+    type Error = Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        // TODO: use regex to check the format;
+        // TODO: or use trans err.
+        let mut iter = value.split(':');
+        let name = match iter.next() {
+            Some(name) => name.to_string(),
+            None => {
+                return Err(Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "region format error",
+                ))
+            }
+        };
+        let mut iter = match iter.next() {
+            Some(start_end) => start_end.split('-'),
+            None => {
+                return Err(Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "region format error",
+                ))
+            }
+        };
+        let start = match iter.next() {
+            Some(start) => match start.parse::<u64>() {
+                Ok(start) => start,
+                Err(_) => {
+                    return Err(Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "region format error",
+                    ))
+                }
+            },
+            None => {
+                return Err(Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "region format error",
+                ))
+            }
+        };
+        let end = match iter.next() {
+            Some(end) => match end.parse::<u64>() {
+                Ok(end) => end,
+                Err(_) => {
+                    return Err(Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "region format error",
+                    ))
+                }
+            },
+            None => {
+                return Err(Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "region format error",
+                ))
+            }
+        };
+        if start > end {
+            return Err(Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "region format error",
+            ));
         }
+        Ok(GenomeRegion { name, start, end })
     }
 }
 
@@ -118,6 +178,12 @@ fn read_genome_region<R: Read>(reader: R) -> Result<Vec<GenomeRegion>, csv::Erro
     let mut regions = Vec::new();
     for result in rdr.deserialize() {
         let record: GenomeRegion = result?;
+        if record.start > record.end {
+            return Err(csv::Error::from(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "region format error",
+            ))); // TODO: should be organized
+        }
         regions.push(record);
     }
     Ok(regions)
