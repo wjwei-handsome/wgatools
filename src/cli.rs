@@ -88,7 +88,7 @@ pub enum Commands {
         #[arg(required = false)]
         input: Option<String>,
     },
-    /// Extract specific region from MAF format
+    /// Extract specific region from MAF file with index
     #[command(visible_alias = "me", name = "maf-ext")]
     MafExtract {
         /// Input MAF File, None for STDIN
@@ -115,12 +115,22 @@ pub enum Commands {
         #[arg(required = false)]
         input: Option<String>,
     },
-    /// TEST: maf-index
+    /// Build index for MAF file
     #[command(visible_alias = "mi", name = "maf-index")]
     MafIndex {
-        /// Input MAF File, None for STDIN
+        /// Input MAF File
         #[arg(required = true)]
         input: String,
+    },
+    /// TEST: tview
+    #[command(visible_alias = "tv", name = "tview")]
+    Tview {
+        /// Input MAF File, with index '.index'
+        #[arg(required = false)]
+        input: String,
+        /// Move step size
+        #[arg(required = false, long, short, default_value = "10")]
+        step: usize,
     },
 }
 

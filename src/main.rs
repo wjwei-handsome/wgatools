@@ -1,6 +1,8 @@
+use log::error;
 use wgalib::cli::{make_cli_parse, Commands};
 use wgalib::log::init_logger;
 use wgalib::tools::caller::maf_call;
+use wgalib::tools::tview::tview;
 use wgalib::utils::{
     chain2maf, chain2paf, maf2chain, maf2paf, maf2sam, paf2chain, paf2maf, wrap_build_index,
     wrap_maf_extract,
@@ -49,14 +51,17 @@ fn main() {
         } => {
             wrap_maf_extract(input, regions, file, &outfile, rewrite);
         }
-        Commands::Call { input } => {
-            println!("Call: {:?}", input);
+        Commands::Call { input: _ } => {
             maf_call();
         }
-        Commands::Maf2Sam { input } => {
-            println!("maf2sam: {:?}", input);
-            maf2sam(input, &outfile, rewrite)
-        }
+        Commands::Maf2Sam { input } => maf2sam(input, &outfile, rewrite),
         Commands::MafIndex { input } => wrap_build_index(input, &outfile),
+        Commands::Tview { input, step } => match tview(input, *step) {
+            Ok(_) => {}
+            Err(err) => {
+                error!("Error: {}", err);
+                std::process::exit(1);
+            }
+        },
     }
 }
