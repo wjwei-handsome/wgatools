@@ -86,7 +86,7 @@ pub struct MAFSLine {
     pub align_size: u64,
     strand: Strand,
     pub size: u64,
-    seq: String,
+    pub seq: String,
 }
 
 // impl mut for MAFSLine
