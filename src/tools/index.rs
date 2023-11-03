@@ -20,6 +20,7 @@ pub fn build_index(mafreader: &mut MAFReader<File>, idx_wtr: Box<dyn Write>) {
             break;
         }
         let record = record.unwrap().unwrap();
+        // TODO: check if name is unique
         for (ord, sline) in enumerate(record.slines) {
             let name = sline.name;
             let start = sline.start;
