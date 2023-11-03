@@ -1,9 +1,15 @@
+use itertools::enumerate;
+use log::error;
+use regex::Regex;
 use std::{
     error::Error,
-    io,
+    fs::File,
+    io::{self, BufReader, Read, Seek},
     rc::Rc,
     time::{Duration, Instant},
 };
+
+use rust_lapper::{Interval, Lapper};
 
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
@@ -12,73 +18,109 @@ use crossterm::{
 };
 use ratatui::{prelude::*, widgets::*};
 
-use crate::parser::{common::AlignRecord, maf::MAFReader};
+use crate::parser::maf::MAFReader;
 
+use super::index::MafIndex;
+
+const WINDOW_SIZE: usize = 20;
+
+// ref to <https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit>
+const OPTION_8BIT_COLOR: [u8; 10] = [2, 14, 3, 4, 5, 1, 8, 27, 99, 36];
+
+#[derive(Default)]
 struct Scroll<'a> {
-    axis_scroll_state: ScrollbarState,
-    axis_scroll: usize,
-    indicator_scroll_state: ScrollbarState,
-    indicator_scroll: usize,
-    sline_scroll_state: ScrollbarState,
-    sline_scroll: usize,
+    scroll: usize,
+    scroll_state: ScrollbarState,
     para_lines: Vec<Line<'a>>,
+    ref_name: String,
+    ref_start: u64,
+    destpos: u64,
+    seek: u64,
+    block_size: usize,
 }
 
 impl Scroll<'_> {
     fn scroll_left(&mut self, step: usize) {
-        self.axis_scroll = self.axis_scroll.saturating_sub(step);
-        self.axis_scroll_state = self.axis_scroll_state.position(self.axis_scroll);
-        self.indicator_scroll = self.indicator_scroll.saturating_sub(step);
-        self.indicator_scroll_state = self.indicator_scroll_state.position(self.indicator_scroll);
-        self.sline_scroll = self.sline_scroll.saturating_sub(step);
-        self.sline_scroll_state = self.sline_scroll_state.position(self.sline_scroll);
+        self.scroll = self.scroll.saturating_sub(step);
+        self.scroll_state = self.scroll_state.position(self.scroll);
     }
 
     fn scroll_right(&mut self, step: usize) {
-        self.axis_scroll = self.axis_scroll.saturating_add(step);
-        self.axis_scroll_state = self.axis_scroll_state.position(self.axis_scroll);
-        self.indicator_scroll = self.indicator_scroll.saturating_add(step);
-        self.indicator_scroll_state = self.indicator_scroll_state.position(self.indicator_scroll);
-        self.sline_scroll = self.sline_scroll.saturating_add(step);
-        self.sline_scroll_state = self.sline_scroll_state.position(self.sline_scroll);
+        if self.scroll + step > self.block_size {
+            self.scroll = self.block_size;
+        } else {
+            self.scroll = self.scroll.saturating_add(step);
+        }
+        // self.scroll = self.scroll.saturating_add(step);
+        self.scroll_state = self.scroll_state.position(self.scroll);
     }
 }
 
+type Iv = Interval<u64, u64>;
+
 struct Navigation {
     show: bool,
-    all_seqs: Vec<String>,
-    candidate_seqs: Vec<String>,
-    select_index: usize,
     input: String,
     cursor_position: usize,
+    input_valid: bool,
+    cddt_name: Vec<String>,
+    select_name_idx: usize,
+    cddt_region: Vec<String>,
+    select_region_idx: usize,
+    all_regions: Vec<Vec<Iv>>,
+    select_region: bool,
 }
 
 impl Navigation {
     fn select_up(&mut self) {
         if self.show {
-            if self.select_index == 0 {
-                self.select_index = self.candidate_seqs.len();
+            if !self.select_region {
+                if self.select_name_idx == 0 {
+                    self.select_name_idx = self.cddt_name.len();
+                }
+                self.select_name_idx = self.select_name_idx.saturating_sub(1);
+                self.cddt_region = ivvec2strvec(&self.all_regions[self.select_name_idx]);
+                self.select_region_idx = 0;
+                self.update_input();
+            } else {
+                if self.select_region_idx == 0 {
+                    self.select_region_idx = self.cddt_region.len();
+                }
+                self.select_region_idx = self.select_region_idx.saturating_sub(1);
+                self.update_input();
             }
-            self.select_index = self.select_index.saturating_sub(1);
-            self.input
-                .replace_range(6.., &self.candidate_seqs[self.select_index]);
-            self.input.push(':');
-            self.cursor_position = self.input.len();
         }
     }
 
     fn select_down(&mut self) {
         if self.show {
-            if self.select_index + 1 == self.candidate_seqs.len() {
-                self.select_index = 0;
-                return;
+            if !self.select_region {
+                if self.select_name_idx + 1 == self.cddt_name.len() {
+                    self.select_name_idx = 0;
+                } else {
+                    self.select_name_idx = self.select_name_idx.saturating_add(1);
+                }
+                // update regions
+                self.cddt_region = ivvec2strvec(&self.all_regions[self.select_name_idx]);
+                self.select_region_idx = 0;
+                self.update_input();
+            } else {
+                if self.select_region_idx + 1 == self.cddt_region.len() {
+                    self.select_region_idx = 0;
+                } else {
+                    self.select_region_idx = self.select_region_idx.saturating_add(1);
+                }
+                self.update_input();
             }
-            self.select_index = self.select_index.saturating_add(1);
-            self.input
-                .replace_range(6.., &self.candidate_seqs[self.select_index]);
-            self.input.push(':');
-            self.cursor_position = self.input.len();
         }
+    }
+
+    fn update_input(&mut self) {
+        let name = &self.cddt_name[self.select_name_idx];
+        let region = &self.cddt_region[self.select_region_idx];
+        let replace_text = format!("{}:{}", name, region);
+        self.input.replace_range(6.., &replace_text);
+        self.cursor_position = self.input.len();
     }
 
     fn move_cursor_left(&mut self) {
@@ -118,49 +160,166 @@ impl Navigation {
     }
 }
 
-struct MafViewApp<'a> {
+struct MafViewApp<'a, R: Read + Send + Seek> {
     fixed: Vec<Line<'a>>,
-    indexed: bool,
     scroll: Scroll<'a>,
     navigation: Navigation,
+    #[allow(dead_code)]
+    wait: bool,
+    filerdr: MAFReader<R>,
 }
 
-impl Default for MafViewApp<'_> {
-    fn default() -> Self {
-        let item_list = vec!["Zm-B73v5.chr8".to_string(), "Zm-CML333.chr8".to_string()];
-        let scroll = Scroll {
-            axis_scroll_state: ScrollbarState::default(),
-            axis_scroll: 0,
-            indicator_scroll_state: ScrollbarState::default(),
-            indicator_scroll: 0,
-            sline_scroll_state: ScrollbarState::default(),
-            sline_scroll: 0,
-            para_lines: Vec::new(),
-        };
-        let navigation = Navigation {
+impl MafViewApp<'_, File> {
+    fn gen_navigation(mafindex: MafIndex) -> Navigation {
+        let mut all_regions = Vec::new();
+        let mut cddt_names = Vec::new();
+        for (name, mafindex_item) in mafindex {
+            let mut region = Vec::new();
+            for ivp in &mafindex_item.ivls {
+                region.push(Iv {
+                    start: ivp.start,
+                    stop: ivp.end,
+                    val: ivp.offset,
+                });
+            }
+            cddt_names.push(name.to_string());
+            all_regions.push(region);
+        }
+        let cddt_regions = &all_regions[0];
+        Navigation {
             show: false,
-            all_seqs: item_list.clone(),
-            candidate_seqs: item_list,
-            select_index: 0,
             input: "Goto: ".to_string(),
             cursor_position: 6,
+            input_valid: true,
+            cddt_name: cddt_names,
+            select_name_idx: 0,
+            cddt_region: ivvec2strvec(cddt_regions),
+            select_region_idx: 0,
+            all_regions,
+            select_region: false,
+        }
+    }
+
+    fn new(input: &String) -> Result<Self, Box<dyn Error>> {
+        // creat reader
+        let mut mafreader = MAFReader::from_path(input)?;
+        // init scroll, fixed
+        let mut scroll = Scroll::default();
+        let mut fixed = vec![Line::from("pos:"), Line::from("|")];
+        // read index
+        let index_file = File::open(format!("{}.index", input))?;
+        let mafindex: MafIndex = serde_json::from_reader(BufReader::new(index_file))?;
+        // create navigation
+        let mut navigation = Self::gen_navigation(mafindex);
+
+        // init first record
+        let init_maf_rec = match mafreader.records().next() {
+            Some(Ok(mafrec)) => mafrec,
+            _ => return Err("empty maf file".into()),
         };
-        let fixed = vec![
-            Line::from("pos: "),
-            Line::from("|"),
-            Line::from("target"),
-            Line::from("query"),
+
+        // init first line as ref line
+        let init_sline = &init_maf_rec.slines[0];
+        let init_ref_seq = &init_sline.name;
+        scroll.ref_name = init_ref_seq.to_string();
+        scroll.ref_start = init_maf_rec.slines[0].start;
+
+        let ref_seq = &init_sline.seq;
+
+        let (axis_text, indicator_text, len_count) =
+            get_axis_idc_len(ref_seq, scroll.ref_start, WINDOW_SIZE);
+
+        let mut para_lines = vec![
+            Line::from(axis_text.red()),
+            Line::from(indicator_text.yellow()),
         ];
-        Self {
+        for (idx, sline) in enumerate(&init_maf_rec.slines) {
+            let seq = &sline.seq;
+            let name = &sline.name;
+            let color = Color::Indexed(OPTION_8BIT_COLOR[idx % 10]);
+            para_lines.push(Line::from(seq.to_string().fg(color)));
+            fixed.push(Line::from(name.to_string().fg(color)));
+        }
+
+        scroll.block_size = len_count;
+        scroll.scroll_state = scroll.scroll_state.content_length(len_count);
+        scroll.para_lines = para_lines;
+        navigation.update_input();
+
+        let app = Self {
             fixed,
-            indexed: false,
             scroll,
             navigation,
+            wait: false,
+            filerdr: mafreader,
+        };
+
+        Ok(app)
+    }
+
+    fn update(&mut self) -> Result<(), Box<dyn Error>> {
+        self.filerdr
+            .inner
+            .seek(std::io::SeekFrom::Start(self.scroll.seek))?;
+        // new mafrec
+        let mafrec = match self.filerdr.records().next() {
+            Some(Ok(mafrec)) => mafrec,
+            _ => return Err("empty maf file".into()),
+        };
+
+        // change ref line
+        let mut add_para_lines = Vec::new();
+        let mut add_fixed_lines = Vec::new();
+        // let mut first_3_para_lines = Vec::new();
+        for (idx, sline) in enumerate(mafrec.slines) {
+            let name = &sline.name;
+            let seq = &sline.seq;
+            let option_colors = OPTION_8BIT_COLOR;
+            let first_color = Color::Indexed(option_colors[0]);
+            let rest_option_color = option_colors.split_at(1).1;
+            let color = Color::Indexed(rest_option_color[idx % 10]);
+            if self.scroll.ref_name == *name {
+                // change ...
+                self.scroll.ref_start = sline.start;
+                let ref_start = sline.start;
+                let ref_seq = &sline.seq;
+
+                let (axis_text, indicator_text, len_count) =
+                    get_axis_idc_len(ref_seq, ref_start, WINDOW_SIZE);
+                let first_3_para_lines = vec![
+                    Line::from(axis_text.red()),
+                    Line::from(indicator_text.yellow()),
+                    Line::from(seq.to_string().fg(first_color)),
+                ];
+                let first_3_fixed_lines = vec![
+                    Line::from("pos:"),
+                    Line::from("|"),
+                    Line::from(name.to_string().fg(first_color)),
+                ];
+
+                self.scroll.para_lines = first_3_para_lines;
+                self.fixed = first_3_fixed_lines;
+                self.scroll.block_size = len_count;
+                self.scroll.scroll_state = self.scroll.scroll_state.content_length(len_count);
+            } else {
+                add_para_lines.push(Line::from(seq.to_string().fg(color)));
+                add_fixed_lines.push(Line::from(name.to_string().fg(color)));
+            }
         }
+        self.scroll.para_lines.append(&mut add_para_lines);
+        self.fixed.append(&mut add_fixed_lines);
+        // scroll
+        let current_pos = self.scroll.ref_start + self.scroll.scroll as u64;
+        let scroll_size = self.scroll.destpos - current_pos;
+        self.scroll.scroll_right(scroll_size as usize);
+        Ok(())
     }
 }
 
-pub fn test_tview() -> Result<(), Box<dyn Error>> {
+pub fn tview(input: &String, step: usize) -> Result<(), Box<dyn Error>> {
+    // creat app and fill init data
+    let app = MafViewApp::new(input)?;
+
     // setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -168,64 +327,9 @@ pub fn test_tview() -> Result<(), Box<dyn Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // create app and run it
+    // run app
     let tick_rate = Duration::from_millis(250);
-    let mut app = MafViewApp::default();
-    app.navigation.candidate_seqs = app.navigation.all_seqs.clone();
-
-    // impute fake data
-    let mut mafreader = MAFReader::from_path("sub.maf").unwrap();
-    let mafrec = mafreader.records().next().unwrap().unwrap();
-
-    let mut target_seq = mafrec.target_seq().to_string();
-    target_seq.push('\n');
-    let mut query_seq = mafrec.query_seq().to_string();
-    query_seq.push('\n');
-
-    let t_start = mafrec.target_start();
-    let t_end = mafrec.target_end();
-
-    let t_name = mafrec.target_name();
-    let q_name = mafrec.query_name();
-
-    let mut axis_text = String::new();
-    let mut indicator_text = String::new();
-    let window_size = 20;
-
-    for pos in (t_start..t_end).step_by(window_size) {
-        axis_text.push_str(&format!("{}", pos));
-        indicator_text.push('|');
-        indicator_text.push_str(&" ".repeat(window_size - 1));
-        // count pos digits
-        let pos_digits = pos.to_string().len();
-        let fill_size = window_size - pos_digits;
-        axis_text.push_str(&" ".repeat(fill_size));
-    }
-
-    axis_text.push('\n');
-    indicator_text.push('\n');
-
-    app.scroll.axis_scroll_state = app.scroll.axis_scroll_state.content_length(axis_text.len());
-    app.scroll.indicator_scroll_state = app
-        .scroll
-        .indicator_scroll_state
-        .content_length(indicator_text.len());
-    app.scroll.sline_scroll_state = app
-        .scroll
-        .sline_scroll_state
-        .content_length(target_seq.len());
-    let text = vec![
-        Line::from(axis_text.red()),
-        Line::from(indicator_text.yellow()),
-        Line::from(target_seq.green()),
-        Line::from(query_seq.blue()),
-    ];
-    app.scroll.para_lines = text;
-
-    app.fixed[2] = Line::from(t_name.green());
-    app.fixed[3] = Line::from(q_name.blue());
-
-    let res = run_app(&mut terminal, app, tick_rate);
+    let res = run_app(&mut terminal, app, tick_rate, step);
 
     // restore terminal
     disable_raw_mode()?;
@@ -237,7 +341,7 @@ pub fn test_tview() -> Result<(), Box<dyn Error>> {
     terminal.show_cursor()?;
 
     if let Err(err) = res {
-        println!("{err:?}");
+        error!("{err:?}");
     }
 
     Ok(())
@@ -245,8 +349,9 @@ pub fn test_tview() -> Result<(), Box<dyn Error>> {
 
 fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
-    mut app: MafViewApp,
+    mut app: MafViewApp<'_, File>,
     tick_rate: Duration,
+    step: usize,
 ) -> io::Result<()> {
     let mut last_tick = Instant::now();
     loop {
@@ -260,17 +365,16 @@ fn run_app<B: Backend>(
                         if app.navigation.show {
                             app.navigation.move_cursor_left();
                         } else {
-                            app.scroll.scroll_left(10);
+                            app.scroll.scroll_left(step);
                         }
                     }
                     KeyCode::Right => {
                         if app.navigation.show {
                             app.navigation.move_cursor_right();
                         } else {
-                            app.scroll.scroll_right(10);
+                            app.scroll.scroll_right(step);
                         }
                     }
-
                     KeyCode::Up => {
                         app.navigation.select_up();
                     }
@@ -291,10 +395,29 @@ fn run_app<B: Backend>(
                             app.navigation.show = true;
                         }
                     }
-
                     KeyCode::Backspace => {
                         if app.navigation.show {
                             app.navigation.delete_char();
+                        }
+                    }
+                    KeyCode::Tab => {
+                        if app.navigation.show {
+                            app.navigation.select_region = !app.navigation.select_region;
+                        }
+                    }
+                    KeyCode::Enter => {
+                        if app.navigation.show && app.navigation.input_valid {
+                            match app.update() {
+                                Ok(_) => {
+                                    app.navigation.show = false;
+                                }
+                                Err(err) => {
+                                    return Err(io::Error::new(
+                                        io::ErrorKind::Other,
+                                        format!("{:?}", err),
+                                    ));
+                                }
+                            }
                         }
                     }
                     _ => {}
@@ -307,133 +430,202 @@ fn run_app<B: Backend>(
     }
 }
 
-fn main_ui(f: &mut Frame, app: &mut MafViewApp) {
+fn main_ui(f: &mut Frame, app: &mut MafViewApp<'_, File>) {
     let size = f.size();
 
     let block = Block::default().black();
     f.render_widget(block, size);
 
     let main_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(1), Constraint::Percentage(99)])
-        .split(size);
-
-    let inner_layout = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(10), Constraint::Percentage(90)])
-        .split(main_layout[1]);
+        .constraints([Constraint::Percentage(15), Constraint::Percentage(85)])
+        .split(size);
 
     let create_block = |title| {
         Block::default()
             .borders(Borders::ALL)
-            .gray()
-            .title(Span::styled(
-                title,
-                Style::default().add_modifier(Modifier::BOLD),
-            ))
+            .cyan()
+            .title(block::Title::from(title).alignment(Alignment::Center))
+            .border_type(BorderType::Rounded)
     };
 
-    let title = Block::default()
-        .title("Use ◄ ► to scroll")
-        .title_alignment(Alignment::Center);
-    f.render_widget(title, main_layout[0]);
-
-    let seqname_para = Paragraph::new(app.fixed.clone())
-        .gray()
-        .block(create_block("seq name"));
-    f.render_widget(seqname_para, inner_layout[0]);
+    let seqname_para = Paragraph::new(app.fixed.clone()).block(create_block("seq name"));
+    f.render_widget(seqname_para, main_layout[0]);
 
     let paragraph = Paragraph::new(app.scroll.para_lines.clone())
-        .gray()
-        .block(create_block(
-            "Horizontal scrollbar with only begin arrow & custom thumb symbol",
-        ))
-        .scroll((0, app.scroll.axis_scroll as u16));
-    f.render_widget(paragraph, inner_layout[1]);
+        .block(create_block("Press ◄ ► to scroll"))
+        .scroll((0, app.scroll.scroll as u16));
+    f.render_widget(paragraph, main_layout[1]);
     f.render_stateful_widget(
         Scrollbar::default()
             .orientation(ScrollbarOrientation::HorizontalBottom)
-            .thumb_symbol("*")
-            .end_symbol(None),
-        inner_layout[1].inner(&Margin {
+            .thumb_symbol("░")
+            .track_symbol(Some("─")),
+        main_layout[1].inner(&Margin {
             vertical: 0,
             horizontal: 1,
         }),
-        &mut app.scroll.axis_scroll_state,
+        &mut app.scroll.scroll_state,
     );
 
     if app.navigation.show {
-        let mut matched = true;
+        // judge if input is valid
+        app.navigation.input_valid = true;
+        // update jump to seek/ Destination / ref name from **valid**-input
+        input_valid_update(app);
 
-        let area = centered_rect(60, 20, size);
-        f.render_widget(Clear, area[0]);
-        f.render_widget(Clear, area[1]);
+        // gen 4 split areas
+        let two_scroll_one_input_one_msg = gen_two_scroll_one_input_one_msg_area(f);
+        // two scroll areas
+        let two_scroll = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
+            .split(two_scroll_one_input_one_msg[0]);
+        let scroll_area_0 = two_scroll[0];
+        let scroll_area_1 = two_scroll[1];
+        // input area
+        let input_area = two_scroll_one_input_one_msg[1];
+        // msg area
+        let msg_area = two_scroll_one_input_one_msg[2];
 
-        let match_text = &app.navigation.input[6..];
-        if !match_text.ends_with(':') {
-            let mut new_candidate_seqs = Vec::new();
-            for item in app.navigation.all_seqs.iter() {
-                if item.contains(match_text) {
-                    new_candidate_seqs.push(item.clone());
-                }
-            }
-            if !new_candidate_seqs.is_empty() {
-                app.navigation.candidate_seqs = new_candidate_seqs;
-                app.navigation.select_index = 0;
-            } else {
-                matched = false;
-            }
-        }
-        if matched {
-            let items: Vec<ListItem> = app
-                .navigation
-                .candidate_seqs
-                .iter()
-                .map(|i| {
-                    let lines = vec![i.clone().italic().into()];
-                    ListItem::new(lines).style(Style::default().fg(Color::Black).bg(Color::White))
-                })
-                .collect();
-            // Create a List from all list items and highlight the currently selected one
-            let items = List::new(items)
-                .block(Block::default().borders(Borders::ALL).title("List"))
-                .highlight_style(
-                    Style::default()
-                        .bg(Color::LightGreen)
-                        .add_modifier(Modifier::BOLD),
-                )
-                .highlight_symbol(">> ");
-
-            let mut state = ListState::default().with_selected(Some(app.navigation.select_index));
-
-            f.render_stateful_widget(items, area[0], &mut state);
-
-            let mut scrollbar_state = ScrollbarState::default()
-                .content_length(app.navigation.candidate_seqs.len())
-                .position(app.navigation.select_index);
-
-            f.render_stateful_widget(
-                Scrollbar::default()
-                    // .orientation(ScrollbarOrientation::VerticalRight)
-                    .thumb_symbol("░")
-                    .track_symbol(Some("─")),
-                area[0],
-                &mut scrollbar_state,
-            );
+        // set selected background color
+        let (name_bg_col, region_bg_col) = if app.navigation.select_region {
+            (Color::LightYellow, Color::LightGreen)
         } else {
-            let text = vec![Line::from("No match!")];
-            let paragraph = Paragraph::new(text).gray();
-            f.render_widget(paragraph, area[0]);
-        }
+            (Color::LightGreen, Color::LightYellow)
+        };
 
-        let input = Paragraph::new(app.navigation.input.as_str()).gray();
-        f.render_widget(input, area[1]);
-        f.set_cursor(area[1].x + app.navigation.cursor_position as u16, area[1].y);
+        // fill name candidate scroll
+        gen_fill_scroll(
+            f,
+            scroll_area_0,
+            &app.navigation.cddt_name,
+            app.navigation.select_name_idx,
+            name_bg_col,
+            "Name",
+        );
+        // fill region candidate scroll
+        gen_fill_scroll(
+            f,
+            scroll_area_1,
+            &app.navigation.cddt_region,
+            app.navigation.select_region_idx,
+            region_bg_col,
+            "Region",
+        );
+
+        let input = Paragraph::new(app.navigation.input.as_str()).magenta();
+        f.render_widget(input, input_area);
+        f.set_cursor(
+            input_area.x + app.navigation.cursor_position as u16,
+            input_area.y,
+        );
+
+        let message = if app.navigation.input_valid {
+            "Press ▲ ▼ to select, <Tab> to switch between name and region, <Esc> to exit, <Enter> to jump"
+        } else {
+            "Invalid input, please re-select or enter"
+        };
+        let msg = Paragraph::new(message).light_blue();
+        f.render_widget(msg, msg_area);
     }
 }
 
-/// helper function to create a centered rect using up certain percentage of the available rect `r`
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rc<[Rect]> {
+fn get_axis_idc_len(seq: &str, start: u64, window_size: usize) -> (String, String, usize) {
+    let mut axis_text = String::new();
+    let mut indicator_text = String::new();
+    let mut idx = 0;
+    let mut len_count = 0;
+    for base in seq.chars() {
+        len_count += 1;
+        if base == '-' {
+            axis_text.push(' ');
+            indicator_text.push(' ');
+        } else if idx % window_size == 0 {
+            let pos = start + idx as u64;
+            axis_text.push_str(&format!(
+                "{:width$}",
+                pos.to_string(),
+                width = { window_size }
+            ));
+            indicator_text.push('|');
+            idx += 1
+        } else {
+            indicator_text.push(' ');
+            idx += 1
+        }
+    }
+    axis_text.push('\n');
+    indicator_text.push('\n');
+    (axis_text, indicator_text, len_count)
+}
+
+fn ivvec2strvec(invec: &[Iv]) -> Vec<String> {
+    invec
+        .iter()
+        .map(|i| format!("{}-{}", i.start, i.stop))
+        .collect::<Vec<String>>()
+}
+
+fn input_valid_update(app: &mut MafViewApp<'_, File>) {
+    let re = Regex::new(r"^[a-zA-Z0-9.-]+:[0-9]+(-[0-9]+)?$").unwrap();
+    match re.is_match(&app.navigation.input[6..]) {
+        true => {
+            let name = &app.navigation.input[6..].split(':').collect::<Vec<&str>>()[0];
+            match app.navigation.cddt_name.iter().position(|i| i == name) {
+                Some(name_idx) => {
+                    let region = &app.navigation.input[6..].split(':').collect::<Vec<&str>>()[1];
+                    let start = match region.split('-').collect::<Vec<&str>>()[0].parse::<usize>() {
+                        Ok(i) => i,
+                        Err(_) => {
+                            app.navigation.input_valid = false;
+                            0
+                        }
+                    };
+                    let end = match region.contains('-') {
+                        true => {
+                            match region.split('-').collect::<Vec<&str>>()[1].parse::<usize>() {
+                                Ok(i) => i,
+                                Err(_) => {
+                                    app.navigation.input_valid = false;
+                                    0
+                                }
+                            }
+                        }
+                        false => start,
+                    };
+                    if start > end {
+                        app.navigation.input_valid = false;
+                    } else {
+                        let cddt_regions: &Vec<Iv> = &app.navigation.all_regions[name_idx];
+                        let lapper = Lapper::new(cddt_regions.clone());
+                        let find = lapper
+                            .find(start as u64, start as u64 + 1)
+                            .collect::<Vec<&Iv>>();
+                        if find.is_empty() {
+                            app.navigation.input_valid = false;
+                        } else {
+                            let dest_block = find[0];
+                            app.scroll.seek = dest_block.val;
+                            app.scroll.destpos = start as u64;
+                            app.scroll.ref_name = name.to_string();
+                        }
+                    }
+                }
+                None => {
+                    app.navigation.input_valid = false;
+                }
+            }
+        }
+        false => {
+            app.navigation.input_valid = false;
+        }
+    }
+}
+
+fn gen_two_scroll_one_input_one_msg_area(f: &mut Frame) -> Rc<[Rect]> {
+    let percent_y = 20;
+    let percent_x = 60;
     let ver_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -441,7 +633,7 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rc<[Rect]> {
             Constraint::Percentage(percent_y),
             Constraint::Percentage((100 - percent_y) / 2),
         ])
-        .split(r);
+        .split(f.size());
 
     let hor_layout = Layout::default()
         .direction(Direction::Horizontal)
@@ -451,9 +643,58 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rc<[Rect]> {
             Constraint::Percentage((100 - percent_x) / 2),
         ])
         .split(ver_layout[1]);
-
     Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(80), Constraint::Percentage(20)])
+        .constraints([
+            Constraint::Percentage(80),
+            Constraint::Percentage(10),
+            Constraint::Percentage(10),
+        ])
         .split(hor_layout[1])
+}
+
+fn gen_fill_scroll(
+    f: &mut Frame,
+    area: Rect,
+    cddt: &Vec<String>,
+    idx: usize,
+    select_bg_col: Color,
+    title: &str,
+) {
+    let scroll_item = cddt
+        .iter()
+        .map(|i| {
+            ListItem::new(
+                Text::from(i.clone()),
+                // lines.into_iter(),
+            )
+            .style(Style::default().fg(Color::Black).bg(Color::White))
+        })
+        .collect::<Vec<ListItem>>();
+    let scroll_item = List::new(scroll_item)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(block::Title::from(title).alignment(Alignment::Center))
+                .border_type(BorderType::Rounded),
+        )
+        .highlight_style(
+            Style::default()
+                .bg(select_bg_col)
+                .add_modifier(Modifier::BOLD)
+                .add_modifier(Modifier::ITALIC),
+        )
+        .highlight_symbol(">> ");
+    let mut scroll_state = ListState::default().with_selected(Some(idx));
+    f.render_stateful_widget(scroll_item, area, &mut scroll_state);
+    let mut scrollbar_state = ScrollbarState::default()
+        .content_length(cddt.len())
+        .position(idx);
+    f.render_stateful_widget(
+        Scrollbar::default()
+            .thumb_symbol("░")
+            .track_symbol(Some("─")),
+        area,
+        &mut scrollbar_state,
+    );
 }
