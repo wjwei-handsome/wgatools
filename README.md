@@ -8,6 +8,7 @@
 ## TOOLS
 
 ### WHAT HAVE DONE
+
 - [x] PAF file reader
 - [x] MAF file reader
 - [x] Chain file reader
@@ -20,15 +21,18 @@
 - [x] Chain2MAF
 - [x] Chain2PAF
 - [x] Call Variants from MAF [In Discussion]
+- [x] Visualize MAF file in terminal
+- [x] Extract regions from MAF file
+- [x] Build MAF index
 
 ### WHAT WILL DO IN FUTURE
-- [ ] SAM file reader [really need?]
+
 - [ ] SAM converter [really need?]
-- [ ] Visualize genome alignment
 - [ ] Call variants and statistics/visualize them
 - [ ] Local improvement of alignment by re-alignment
 - [ ] MAF -> GAF -> HAL
 - [ ] for BIG MAF, should optimize
+- [ ] split & chop MAF file
 
 ### Install
 
@@ -57,6 +61,11 @@ Commands:
   paf2chain  Convert PAF format to Chain format [aliases: p2c]
   chain2maf  Convert Chain format to MAF format [aliases: c2m]
   chain2paf  Convert Chain format to PAF format [aliases: c2p]
+  maf-ext    Extract specific region from MAF file with index [aliases: me]
+  call       Call Variants from MAF file [aliases: c]
+  maf2sam    TEST: maf2sam [aliases: m2s]
+  maf-index  Build index for MAF file [aliases: mi]
+  tview      TEST: tview [aliases: tv]
   help       Print this message or the help of the given subcommand(s)
 
 Options:
@@ -66,14 +75,22 @@ Options:
 GLOBAL:
   -o, --outfile <OUTFILE>  Output file ("-" for stdout) [default: -]
   -r, --rewrite            Bool, if rewrite output file [default: false]
-  -t, --threads <THREADS>  [default: 1]
+  -t, --threads <THREADS>  Threads, default 1 [default: 1]
+  -v, --verbose...         Logging level [-v: Info, -vv: Debug, -vvv: Trace]
 ```
 
 > NOTE: If you want to convert into MAF format, you should provide target and query genome sequence files in [.fa/.fa.gz].
 
+### Examples
+
+#### visualize MAF file in terminal
+
+![example](./example.gif)
+
 ## Library
 
-Some simple reader and iterator for PAF, MAF and Chain files: 
+Some simple reader and iterator for PAF, MAF and Chain files:
+
 ```rust
 use wgatools::parser::paf::PafReader;
 use wgatools::parser::maf::MAFReader;
@@ -89,11 +106,12 @@ fn main() {
 ```
 
 ### TODO for library
+
 - [ ] Error detection and handling
 - [ ] Test cases
 - [ ] Documentations
 
-[//]: # (> It should be extremely fast!![img]&#40;https://raw.githubusercontent.com/wjwei-handsome/wwjPic/main/img/20230706022535.png&#41;)
+[//]: # "> It should be extremely fast!![img](https://raw.githubusercontent.com/wjwei-handsome/wwjPic/main/img/20230706022535.png)"
 
 ## Features
 
