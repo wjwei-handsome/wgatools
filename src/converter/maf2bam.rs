@@ -1,5 +1,4 @@
-
-use crate::parser::maf::{MAFReader};
+use crate::parser::maf::MAFReader;
 use crate::utils::output_writer;
 use noodles::sam::header::record::value::map;
 use noodles::sam::header::record::value::map::header::SortOrder;
@@ -12,11 +11,8 @@ use noodles::sam::{
     },
 };
 
-
 use std::io;
 use std::num::NonZeroUsize;
-
-
 
 /// Convert a MAF Reader to output a BAM file
 // pub fn maf2bam<R: io::Read + Send>(mafreader: &mut MAFReader<R>, outputpath: &str) {
