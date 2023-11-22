@@ -3,8 +3,8 @@ use crate::parser::chain::{ChainDataLine, ChainRecord};
 use crate::parser::common::{AlignRecord, Block};
 use csv::Writer;
 use itertools::Itertools;
-use nom::bytes::complete::{tag, take_while};
-use nom::character::{is_alphabetic, is_digit};
+use nom::bytes::complete::{tag, take_till, take_while};
+use nom::character::is_digit;
 use nom::error::Error;
 use nom::multi::fold_many0;
 use nom::IResult;
@@ -31,7 +31,8 @@ fn parse_cigar_unit(input: &[u8]) -> IResult<&[u8], CigarUnit> {
     // take digits
     let (input, len) = take_while(is_digit)(input)?;
     // take alphabetic
-    let (input, op) = take_while(is_alphabetic)(input)?;
+    let (input, op) = take_till(is_digit)(input)?;
+
     // convert len to u64
     // TODO: handle parse error
     let len = str::from_utf8(len).unwrap().parse::<u64>().unwrap();
