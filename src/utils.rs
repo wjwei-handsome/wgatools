@@ -10,6 +10,21 @@ use std::fs::File;
 use std::io::{stdin, stdout, BufRead, BufReader, BufWriter, Stdin, Write};
 use std::path::Path;
 
+pub fn reverse_complement(input: &str) -> String {
+    let mut output = String::with_capacity(input.len());
+    for c in input.chars().rev() {
+        match c {
+            'A' => output.push('T'),
+            'C' => output.push('G'),
+            'G' => output.push('C'),
+            'T' => output.push('A'),
+            'N' => output.push('N'),
+            _ => panic!("Invalid character"),
+        }
+    }
+    output
+}
+
 // refer from rustybam, thanks @Mitchell R. Vollger <mrvollger@gmail.com>
 type DynResult<T> = Result<T, Box<dyn Error + 'static>>;
 const BUFFER_SIZE: usize = 32 * 1024;

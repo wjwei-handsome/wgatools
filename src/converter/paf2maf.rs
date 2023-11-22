@@ -1,7 +1,7 @@
 use crate::parser::cigar::parse_cigar_to_insert;
-use crate::parser::common::AlignRecord;
+use crate::parser::common::{AlignRecord, Strand};
 use crate::parser::paf::PAFReader;
-use crate::utils::output_writer;
+use crate::utils::{output_writer, reverse_complement};
 use rust_htslib::faidx;
 use std::io;
 use std::io::Write;
@@ -52,6 +52,12 @@ pub fn paf2maf<R: io::Read>(
         // fetch the sequence
         let mut whole_t_seq = t_reader.fetch_seq_string(t_name, t_start, t_end).unwrap();
         let mut whole_q_seq = q_reader.fetch_seq_string(q_name, q_start, q_end).unwrap();
+        match q_strand {
+            Strand::Positive => {}
+            Strand::Negative => {
+                whole_q_seq = reverse_complement(&whole_q_seq);
+            }
+        }
         // nom the cigar string and insert the `-` to sequence
         let (_, _) = parse_cigar_to_insert(&pafrec, &mut whole_t_seq, &mut whole_q_seq).unwrap();
         // write a s-line
