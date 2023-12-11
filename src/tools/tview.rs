@@ -207,7 +207,10 @@ impl MafViewApp<'_, File> {
         let mut scroll = Scroll::default();
         let mut fixed = vec![Line::from("pos:"), Line::from("|")];
         // read index
-        let index_file = File::open(format!("{}.index", input))?;
+        let index_file = match File::open(format!("{}.index", input)) {
+            Ok(f) => f,
+            Err(_) => return Err("index file not found, please create it by maf-index".into()),
+        };
         let mafindex: MafIndex = serde_json::from_reader(BufReader::new(index_file))?;
         // create navigation
         let mut navigation = Self::gen_navigation(mafindex);
@@ -532,6 +535,7 @@ fn main_ui(f: &mut Frame, app: &mut MafViewApp<'_, File>) {
 }
 
 fn get_axis_idc_len(seq: &str, start: u64, window_size: usize) -> (String, String, usize) {
+    let start = start + 1; // MAF is 0-based
     let mut axis_text = String::new();
     let mut indicator_text = String::new();
     let mut idx = 0;
