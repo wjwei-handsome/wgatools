@@ -1,11 +1,10 @@
 use log::error;
 use wgalib::cli::{make_cli_parse, Commands};
 use wgalib::log::init_logger;
-use wgalib::tools::caller::maf_call;
 use wgalib::tools::tview::tview;
 use wgalib::utils::{
     chain2maf, chain2paf, maf2chain, maf2paf, maf2sam, paf2chain, paf2maf, wrap_build_index,
-    wrap_maf_extract,
+    wrap_maf_call, wrap_maf_extract,
 };
 
 fn main() {
@@ -51,8 +50,21 @@ fn main() {
         } => {
             wrap_maf_extract(input, regions, file, &outfile, rewrite);
         }
-        Commands::Call { input: _ } => {
-            maf_call();
+        Commands::Call {
+            input,
+            sample,
+            snp,
+            svlen,
+        } => {
+            wrap_maf_call(
+                input,
+                &outfile,
+                rewrite,
+                *snp,
+                *svlen,
+                false,
+                sample.as_deref(),
+            );
         }
         Commands::Maf2Sam { input } => maf2sam(input, &outfile, rewrite),
         Commands::MafIndex { input } => wrap_build_index(input, &outfile),

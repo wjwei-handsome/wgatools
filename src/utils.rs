@@ -2,6 +2,7 @@ use crate::parser::chain::ChainReader;
 use crate::parser::common::FileFormat;
 use crate::parser::maf::MAFReader;
 use crate::parser::paf::PAFReader;
+use crate::tools::caller::call_var_maf;
 use crate::tools::index::{build_index, MafIndex};
 use crate::tools::mafextra::maf_extract_idx;
 use log::{error, info, warn};
@@ -320,4 +321,60 @@ pub fn wrap_maf_extract(
             todo!("use iterator to extract")
         }
     }
+}
+
+/// Command: maf call
+pub fn wrap_maf_call(
+    input: &String,
+    output: &String,
+    rewrite: bool,
+    snp: bool,
+    svlen: u64,
+    between: bool,
+    sample: Option<&str>,
+) {
+    outfile_exist(output, rewrite);
+
+    let _output_name = match output.as_str() {
+        "-" => "stdout",
+        path => path,
+    };
+
+    let mut writer = output_writer(output);
+
+    let mut mafreader = MAFReader::from_path(input).unwrap();
+    let index_path = format!("{}.index", input);
+    let index_rdr = match File::open(index_path) {
+        Ok(file) => BufReader::new(file),
+        Err(err) => {
+            warn!(
+                "failed to open index file: {},
+                please use `maf-index` to create it;
+                will not generate contig info",
+                err
+            );
+            todo!("use iterator to extract")
+        }
+    };
+    let mafindex: Option<MafIndex> = match serde_json::from_reader(index_rdr) {
+        Ok(mafindex) => mafindex,
+        Err(err) => {
+            warn!(
+                "failed to parse index file: {},
+                please use `maf-index` to create it;
+                will not generate contig info",
+                err
+            );
+            todo!("use iterator to extract")
+        }
+    };
+    call_var_maf(
+        &mut mafreader,
+        mafindex,
+        &mut writer,
+        snp,
+        svlen,
+        between,
+        sample,
+    );
 }
