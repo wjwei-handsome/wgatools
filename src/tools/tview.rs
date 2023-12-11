@@ -54,6 +54,11 @@ impl Scroll<'_> {
         // self.scroll = self.scroll.saturating_add(step);
         self.scroll_state = self.scroll_state.position(self.scroll);
     }
+
+    fn scroll_init(&mut self) {
+        self.scroll = 0;
+        self.scroll_state = self.scroll_state.position(self.scroll);
+    }
 }
 
 type Iv = Interval<u64, u64>;
@@ -269,7 +274,8 @@ impl MafViewApp<'_, File> {
             Some(Ok(mafrec)) => mafrec,
             _ => return Err("empty maf file".into()),
         };
-
+        // init scroll
+        self.scroll.scroll_init();
         // change ref line
         let mut add_para_lines = Vec::new();
         let mut add_fixed_lines = Vec::new();
