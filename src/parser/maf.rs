@@ -321,11 +321,20 @@ impl AlignRecord for MAFRecord {
     }
 
     fn query_start(&self) -> u64 {
-        self.slines[1].start
+        // self.slines[1].start
+        match self.query_strand() {
+            Strand::Positive => self.slines[1].start,
+            Strand::Negative => {
+                self.slines[1].size - self.slines[1].start - self.slines[1].align_size
+            }
+        }
     }
 
     fn query_end(&self) -> u64 {
-        self.slines[1].start + self.slines[1].align_size
+        match self.query_strand() {
+            Strand::Positive => self.slines[1].start + self.slines[1].align_size,
+            Strand::Negative => self.slines[1].size - self.slines[1].start,
+        }
     }
 
     fn query_strand(&self) -> Strand {
@@ -365,20 +374,11 @@ impl AlignRecord for MAFRecord {
         let edit_dist = cigar.mismatch_count + cigar.ins_count + cigar.del_count;
         let nm_tag = String::from("NM:i:") + &*edit_dist.to_string();
 
-        let query_start = match self.query_strand() {
-            Strand::Positive => self.query_start(),
-            Strand::Negative => self.query_length() - self.query_end(),
-        };
-        let query_end = match self.query_strand() {
-            Strand::Positive => self.query_end(),
-            Strand::Negative => self.query_length() - self.query_start(),
-        };
-
         PafRecord {
             query_name: self.query_name().to_string(),
             query_length: self.query_length(),
-            query_start,
-            query_end,
+            query_start: self.query_start(),
+            query_end: self.query_end(),
             strand: self.query_strand(),
             target_name: self.target_name().to_string(),
             target_length: self.target_length(),
