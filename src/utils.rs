@@ -344,8 +344,22 @@ pub fn wrap_maf_call(
 
     let mut mafreader = MAFReader::from_path(input).unwrap();
     let index_path = format!("{}.index", input);
-    let index_rdr = match File::open(index_path) {
-        Ok(file) => BufReader::new(file),
+
+    let mafindex = match File::open(index_path) {
+        Ok(file) => {
+            let index_rdr = BufReader::new(file);
+            match serde_json::from_reader(index_rdr) {
+                Ok(mafindex) => Some(mafindex),
+                Err(err) => {
+                    warn!(
+                        "failed to deserialize index file: {},
+                        please check!",
+                        err
+                    );
+                    None
+                }
+            }
+        }
         Err(err) => {
             warn!(
                 "failed to open index file: {},
@@ -353,21 +367,10 @@ pub fn wrap_maf_call(
                 will not generate contig info",
                 err
             );
-            todo!("use iterator to extract")
+            None
         }
     };
-    let mafindex: Option<MafIndex> = match serde_json::from_reader(index_rdr) {
-        Ok(mafindex) => mafindex,
-        Err(err) => {
-            warn!(
-                "failed to parse index file: {},
-                please use `maf-index` to create it;
-                will not generate contig info",
-                err
-            );
-            todo!("use iterator to extract")
-        }
-    };
+
     call_var_maf(
         &mut mafreader,
         mafindex,
