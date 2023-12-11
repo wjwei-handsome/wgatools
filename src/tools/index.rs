@@ -46,7 +46,7 @@ pub type MafIndex = HashMap<String, MafIndexItem>;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MafIndexItem {
     pub ivls: Vec<IvP>,
-    size: u64,
+    pub size: u64,
     pub ord: usize,
 }
 
