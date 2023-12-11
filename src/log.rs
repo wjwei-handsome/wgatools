@@ -8,10 +8,10 @@ use log4rs::{
 
 pub fn init_logger(verbose: u8) {
     let log_level = match verbose {
-        0 => LevelFilter::Off,
-        1 => LevelFilter::Trace,
+        0 => LevelFilter::Warn,
+        1 => LevelFilter::Info,
         2 => LevelFilter::Debug,
-        _ => LevelFilter::Info,
+        _ => LevelFilter::Trace,
     };
     // Build a stderr logger.
     let log_stderr = ConsoleAppender::builder()
