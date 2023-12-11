@@ -24,8 +24,8 @@ pub struct Cli {
     /// Threads, default 1
     #[arg(long, short, global = true, default_value = "1", help_heading = Some("GLOBAL"))]
     pub threads: usize,
-    /// Logging level [-v: Info, -vv: Debug, -vvv: Trace].
-    #[arg(short, long, global = true, action = ArgAction::Count, help_heading = "GLOBAL")]
+    /// Logging level [-v: Info, -vv: Debug, -vvv: Trace, defalut: Warn].
+    #[arg(short, long, global = true, action = ArgAction::Count, help_heading = Some("GLOBAL"))]
     pub verbose: u8,
     /// Subcommands
     #[command(subcommand)]
@@ -101,12 +101,26 @@ pub enum Commands {
         #[arg(required = false, long, short)]
         file: Option<String>,
     },
-    /// Call Variants from MAF file
+    /// TEST: Call Variants from MAF file
     #[command(visible_alias = "c", name = "call")]
     Call {
-        /// Input MAF File, None for STDIN
-        #[arg(required = false)]
-        input: Option<String>,
+        /// Input MAF File
+        #[arg(required = true)]
+        input: String,
+        /// Sample name
+        #[arg(
+            required = false,
+            long = "sample",
+            short = 'n',
+            default_value = "sample"
+        )]
+        sample: Option<String>,
+        /// If call SNP
+        #[arg(required = false, long = "snp", short = 's', default_value = "false")]
+        snp: bool,
+        /// SV length cutoff
+        #[arg(required = false, long = "svlen", short = 'l', default_value = "50")]
+        svlen: u64,
     },
     /// TEST: maf2sam
     #[command(visible_alias = "m2s", name = "maf2sam")]
@@ -122,7 +136,7 @@ pub enum Commands {
         #[arg(required = true)]
         input: String,
     },
-    /// TEST: tview
+    /// View MAF file in terminal
     #[command(visible_alias = "tv", name = "tview")]
     Tview {
         /// Input MAF File, with index '.index'
