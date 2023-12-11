@@ -225,7 +225,7 @@ impl MAFRecord {
 // TODO: impl a derive macro for AlignRecord to cmp by target_start and target_name
 impl PartialOrd<Self> for MAFRecord {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.cmp(other).into()
+        Some(self.cmp(other))
     }
 }
 
