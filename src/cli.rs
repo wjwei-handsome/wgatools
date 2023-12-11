@@ -101,7 +101,7 @@ pub enum Commands {
         #[arg(required = false, long, short)]
         file: Option<String>,
     },
-    /// TEST: Call Variants from MAF file
+    /// Call Variants from MAF file
     #[command(visible_alias = "c", name = "call")]
     Call {
         /// Input MAF File
