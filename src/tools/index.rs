@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    error::Error,
     fs::File,
     io::{Seek, Write},
 };
@@ -9,17 +10,25 @@ use serde::{Deserialize, Serialize};
 
 use crate::parser::{common::Strand, maf::MAFReader};
 
-pub fn build_index(mafreader: &mut MAFReader<File>, idx_wtr: Box<dyn Write>) {
+pub fn build_index(
+    mafreader: &mut MAFReader<File>,
+    idx_wtr: Box<dyn Write>,
+) -> Result<(), Box<dyn Error>> {
     // init a MAfIndex2 struct
     let mut idx: MafIndex = HashMap::new();
 
     loop {
-        let offset = mafreader.inner.stream_position().unwrap();
+        let offset = mafreader.inner.stream_position()?;
         let record = mafreader.records().next();
-        if record.is_none() {
-            break;
-        }
-        let record = record.unwrap().unwrap();
+        let record = match record {
+            Some(r) => match r {
+                Ok(r) => r,
+                Err(e) => {
+                    return Err(Box::new(e));
+                }
+            },
+            None => break,
+        };
         // TODO: check if name is unique
         for (ord, sline) in enumerate(record.slines) {
             let name = sline.name;
@@ -41,7 +50,8 @@ pub fn build_index(mafreader: &mut MAFReader<File>, idx_wtr: Box<dyn Write>) {
             });
         }
     }
-    serde_json::to_writer(idx_wtr, &idx).unwrap();
+    serde_json::to_writer(idx_wtr, &idx)?;
+    Ok(())
 }
 
 pub type MafIndex = HashMap<String, MafIndexItem>;
