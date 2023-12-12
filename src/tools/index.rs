@@ -29,9 +29,19 @@ pub fn build_index(
             },
             None => break,
         };
-        // TODO: check if name is unique
+
+        let mut name_vec = Vec::new();
         for (ord, sline) in enumerate(record.slines) {
             let name = sline.name;
+            if !name_vec.contains(&name) {
+                name_vec.push(name.clone());
+            } else {
+                let msg = format!(
+                    "Duplicated name `{}` in MAF not allowed, please check or use `modname`",
+                    name
+                );
+                return Err(msg.into());
+            }
             let start = sline.start;
             let end = sline.start + sline.align_size;
             let size = sline.size;
@@ -50,7 +60,12 @@ pub fn build_index(
             });
         }
     }
-    serde_json::to_writer(idx_wtr, &idx)?;
+    // write index to file if not empty
+    if !idx.is_empty() {
+        serde_json::to_writer(idx_wtr, &idx)?
+    } else {
+        return Err("No MAF Record, please check".into());
+    }
     Ok(())
 }
 
