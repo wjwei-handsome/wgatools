@@ -194,44 +194,51 @@ pub fn parse_maf_seq_to_cigar<T: AlignRecord>(rec: &T, with_h: bool) -> Cigar {
         cigar_string.push('H');
     }
 
-    let mut result_len = 0;
+    // let mut result_len = 0;
     for (k, g) in group_by_iter.into_iter() {
         let len = g.count();
         // 10=5X1D2I ==> 15M1D2I
+        // (10,=),(5,X),(1D),(2I)
         match k {
             '=' => {
                 match_count += len;
-                result_len += len;
+                // result_len += len;
+                // cigar_string.push_str(&len.to_string());
+                // cigar_string.push(k);
             }
             'I' => {
-                if result_len != 0 {
-                    cigar_string.push_str(&result_len.to_string());
-                    cigar_string.push('M');
-                }
+                // if result_len != 0 {
+                //     cigar_string.push_str(&result_len.to_string());
+                //     cigar_string.push('M');
+                // }
                 ins_count += len;
-                cigar_string.push_str(&len.to_string());
-                cigar_string.push(k);
-                result_len = 0;
+                // cigar_string.push_str(&len.to_string());
+                // cigar_string.push(k);
+                // result_len = 0;
             }
             'D' => {
-                if result_len != 0 {
-                    cigar_string.push_str(&result_len.to_string());
-                    cigar_string.push('M');
-                }
+                // if result_len != 0 {
+                //     cigar_string.push_str(&result_len.to_string());
+                //     cigar_string.push('M');
+                // }
                 del_count += len;
-                cigar_string.push_str(&len.to_string());
-                cigar_string.push(k);
-                result_len = 0;
+                // cigar_string.push_str(&len.to_string());
+                // cigar_string.push(k);
+                // result_len = 0;
             }
             'X' => {
                 mismatch_count += len;
-                result_len += len;
+                // result_len += len;
+                // cigar_string.push_str(&len.to_string());
+                // cigar_string.push(k);
             }
             _ => {}
         };
+        cigar_string.push_str(&len.to_string());
+        cigar_string.push(k);
     }
-    cigar_string.push_str(&result_len.to_string());
-    cigar_string.push('M');
+    // cigar_string.push_str(&result_len.to_string());
+    // cigar_string.push('M');
 
     if with_h {
         cigar_string.push_str(&end.to_string());
@@ -280,7 +287,7 @@ fn cigar_unit_chain(
     dataline: &mut ChainDataLine,
 ) -> Result<(), ParseError> {
     match op {
-        'M' => {
+        'M' | 'X' | '=' => {
             // will not write unless: [1. size == 0; 2. both no query&target diff]
             if (dataline.size != 0) && (dataline.target_diff + dataline.query_diff != 0) {
                 // TODO: handle IO error
