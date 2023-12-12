@@ -140,34 +140,34 @@ fn parse_sline(line: String) -> Result<MAFSLine, ParseError> {
     let mut iter = line.split_whitespace();
     let mode = match iter.next() {
         Some(mode) => mode.chars().next().unwrap(), // TODO: error handling
-        None => panic!("s-line mode is missing"),   // TODO: error handling
+        None => return Err(ParseError::new_parse_maf_err("mode")),
     };
     let name = match iter.next() {
         Some(name) => name.to_string(),
-        None => panic!("s-line name is missing"), // TODO: error handling
+        None => return Err(ParseError::new_parse_maf_err("name")), // TODO: error handling
     };
     let start = match iter.next() {
         Some(start) => str2u64(start)?,
-        None => panic!("s-line start is missing"), // TODO: error handling
+        None => return Err(ParseError::new_parse_maf_err("start")),
     };
     let align_size = match iter.next() {
         Some(align_size) => str2u64(align_size)?, // TODO: error handling
-        None => panic!("s-line align_size is missing"), // TODO: error handling
+        None => return Err(ParseError::new_parse_maf_err("align size")),
     };
     let strand = match iter.next() {
         Some(strand) => Strand::from(strand), // TODO: error handling
-        None => panic!("s-line strand is missing"), // TODO: error handling
+        None => return Err(ParseError::new_parse_maf_err("strand")),
     };
     let size = match iter.next() {
         Some(size) => str2u64(size)?,
-        None => panic!("s-line size is missing"), // TODO: error handling
+        None => return Err(ParseError::new_parse_maf_err("size")),
     };
     let seq = match iter.next() {
         Some(seq) => seq.to_string(),
-        None => panic!("s-line seq is missing"), // TODO: error handling
+        None => return Err(ParseError::new_parse_maf_err("sequence")),
     };
     if iter.next().is_some() {
-        panic!("s-line has more than 8 fields")
+        return Err(ParseError::new_parse_maf_err("Extra Fields > 8!!"));
     };
     Ok(MAFSLine {
         mode,
