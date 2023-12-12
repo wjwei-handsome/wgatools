@@ -1,6 +1,7 @@
 //! The error kinds when process whole genome alignments(wga)
 
 use crate::parser::common::FileFormat;
+use std::error::Error;
 use std::fmt::Formatter;
 use std::num::ParseIntError;
 use std::{fmt, io};
@@ -29,6 +30,19 @@ pub enum ParseErrorKind {
     ParseSLine,
     /// Parse Int error
     ParseInt,
+}
+
+impl fmt::Display for ParseErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ParseErrorKind::Io => write!(f, "IO"),
+            ParseErrorKind::Empty => write!(f, "Empty"),
+            ParseErrorKind::Serde => write!(f, "Serde"),
+            ParseErrorKind::ParseCigar => write!(f, "ParseCigar"),
+            ParseErrorKind::ParseSLine => write!(f, "ParseSLine"),
+            ParseErrorKind::ParseInt => write!(f, "ParseInt"),
+        }
+    }
 }
 
 ///The parse error returns
@@ -64,33 +78,25 @@ impl ParseError {
             },
         }
     }
+
+    pub fn new_parse_maf_err(field: &str) -> Self {
+        ParseError {
+            msg: format!(
+                "Parse maf error, please check this wrong field `{}`.",
+                field
+            ),
+            kind: ParseErrorKind::ParseSLine,
+            file_info: FileInfo {
+                name: String::from(""),
+                format: FileFormat::Maf,
+            },
+        }
+    }
 }
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.kind {
-            ParseErrorKind::Io => {
-                write!(
-                    f,
-                    "IO error: {}, check path: {}",
-                    self.msg, self.file_info.name
-                )
-            }
-            ParseErrorKind::Empty => {
-                write!(
-                    f,
-                    "Empty input: {}, check path: {}",
-                    self.msg, self.file_info.name
-                )
-            }
-            _ => {
-                write!(
-                    f,
-                    "Parse error: {}, check path: {}",
-                    self.msg, self.file_info.name
-                )
-            }
-        }
+        write!(f, "ErrorKind: {} ErrorMsg: {}", self.kind, self.msg)
     }
 }
 
@@ -130,5 +136,11 @@ impl From<ParseIntError> for ParseError {
                 format: FileFormat::Unknown,
             },
         }
+    }
+}
+
+impl Error for ParseError {
+    fn description(&self) -> &str {
+        &self.msg
     }
 }
