@@ -119,6 +119,7 @@ pub trait AlignRecord {
     fn target_start(&self) -> u64;
     fn target_end(&self) -> u64;
     fn target_strand(&self) -> Strand;
+    fn target_align_size(&self) -> u64;
     fn get_cigar_bytes(&self) -> &[u8] {
         b"*"
     }

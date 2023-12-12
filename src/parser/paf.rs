@@ -161,4 +161,8 @@ impl AlignRecord for PafRecord {
             .unwrap() // TODO: handle a err
             .as_bytes()
     }
+
+    fn target_align_size(&self) -> u64 {
+        self.block_length
+    }
 }

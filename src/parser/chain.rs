@@ -309,11 +309,14 @@ impl AlignRecord for ChainRecord {
         self.header.target.strand
     }
 
+    fn target_align_size(&self) -> u64 {
+        self.header.target.end - self.header.target.start
+    }
+
     fn convert2paf(&self) -> PafRecord {
         let cigar = parse_chain_to_cigar(self, false);
         let cigar_string = cigar.cigar_string;
-        let block_length =
-            (cigar.match_count + cigar.mismatch_count + cigar.ins_count + cigar.del_count) as u64;
+        let block_length = (cigar.match_count + cigar.mismatch_count + cigar.del_count) as u64;
         let matches = cigar.match_count as u64;
         PafRecord {
             query_name: self.query_name().to_string(),
