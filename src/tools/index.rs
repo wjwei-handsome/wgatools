@@ -7,7 +7,7 @@ use std::{
 use itertools::enumerate;
 use serde::{Deserialize, Serialize};
 
-use crate::parser::maf::MAFReader;
+use crate::parser::{common::Strand, maf::MAFReader};
 
 pub fn build_index(mafreader: &mut MAFReader<File>, idx_wtr: Box<dyn Write>) {
     // init a MAfIndex2 struct
@@ -26,16 +26,19 @@ pub fn build_index(mafreader: &mut MAFReader<File>, idx_wtr: Box<dyn Write>) {
             let start = sline.start;
             let end = sline.start + sline.align_size;
             let size = sline.size;
+            let strand = sline.strand;
 
             idx.entry(name.clone()).or_insert(MafIndexItem {
                 ivls: Vec::new(),
                 size,
                 ord,
             });
-            idx.get_mut(&name)
-                .unwrap()
-                .ivls
-                .push(IvP { start, end, offset });
+            idx.get_mut(&name).unwrap().ivls.push(IvP {
+                start,
+                end,
+                strand,
+                offset,
+            });
         }
     }
     serde_json::to_writer(idx_wtr, &idx).unwrap();
@@ -54,5 +57,6 @@ pub struct MafIndexItem {
 pub struct IvP {
     pub start: u64,
     pub end: u64,
+    pub strand: Strand,
     pub offset: u64,
 }
