@@ -71,7 +71,7 @@ fn main() {
         Commands::Tview { input, step } => match tview(input, *step) {
             Ok(_) => {}
             Err(err) => {
-                error!("Error: {}", err);
+                error!("{}", err);
                 std::process::exit(1);
             }
         },
