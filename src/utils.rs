@@ -267,7 +267,13 @@ pub fn wrap_build_index(input: &String, outputpath: &str) {
     //     .from_writer(output_writer(&outputpath));
     // init index-writer
     let idx_wtr = output_writer(&outputpath);
-    build_index(&mut mafreader, idx_wtr)
+    match build_index(&mut mafreader, idx_wtr) {
+        Ok(_) => {}
+        Err(err) => {
+            error!("{}", err);
+            std::process::exit(1);
+        }
+    }
 }
 
 /// Command: maf extract
