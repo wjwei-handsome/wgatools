@@ -56,7 +56,7 @@ fn get_input_regions(
             let genome_region = match GenomeRegion::try_from(region.to_string()) {
                 Ok(genome_region) => genome_region,
                 Err(err) => {
-                    error!("region format error: {} in {}", err, region);
+                    error!("{} in {}", err, region);
                     std::process::exit(1);
                 }
             };
