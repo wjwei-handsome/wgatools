@@ -166,11 +166,17 @@ pub fn cigar_cat(c1: &char, c2: &char) -> char {
 
 pub struct Cigar {
     pub cigar_string: String,
-    // pub bamcigar: CigarString,
     pub match_count: usize,
-    pub ins_count: usize,
-    pub del_count: usize,
     pub mismatch_count: usize,
+    pub ins_event: usize,
+    pub ins_count: usize,
+    pub del_event: usize,
+    pub del_count: usize,
+    pub inv_ins_event: usize,
+    pub inv_ins_count: usize,
+    pub inv_del_event: usize,
+    pub inv_del_count: usize,
+    pub inv_event: usize,
 }
 
 /// parse MAF two seqs into Cigar
@@ -179,11 +185,17 @@ pub fn parse_maf_seq_to_cigar<T: AlignRecord>(rec: &T, with_h: bool) -> Cigar {
     let seq1_iter = rec.target_seq().chars();
     let seq2_iter = rec.query_seq().chars();
     let mut match_count = 0;
-    let mut ins_count = 0;
-    let mut del_count = 0;
     let mut mismatch_count = 0;
+    let mut ins_event = 0;
+    let mut ins_count = 0;
+    let mut del_event = 0;
+    let mut del_count = 0;
+    let mut inv_ins_event = 0;
+    let mut inv_ins_count = 0;
+    let mut inv_del_event = 0;
+    let mut inv_del_count = 0;
+    let mut inv_event = 0;
     let group_by_iter = seq1_iter
-        // .into_par_iter()
         .zip(seq2_iter)
         .group_by(|(c1, c2)| cigar_cat_ext(c1, c2));
 
@@ -194,7 +206,14 @@ pub fn parse_maf_seq_to_cigar<T: AlignRecord>(rec: &T, with_h: bool) -> Cigar {
         cigar_string.push('H');
     }
 
-    // let mut result_len = 0;
+    let inv = match rec.query_strand() {
+        crate::parser::common::Strand::Positive => false,
+        crate::parser::common::Strand::Negative => {
+            inv_event = 1;
+            true
+        }
+    };
+
     for (k, g) in group_by_iter.into_iter() {
         let len = g.count();
         // 10=5X1D2I ==> 15M1D2I
@@ -202,43 +221,33 @@ pub fn parse_maf_seq_to_cigar<T: AlignRecord>(rec: &T, with_h: bool) -> Cigar {
         match k {
             '=' => {
                 match_count += len;
-                // result_len += len;
-                // cigar_string.push_str(&len.to_string());
-                // cigar_string.push(k);
             }
             'I' => {
-                // if result_len != 0 {
-                //     cigar_string.push_str(&result_len.to_string());
-                //     cigar_string.push('M');
-                // }
-                ins_count += len;
-                // cigar_string.push_str(&len.to_string());
-                // cigar_string.push(k);
-                // result_len = 0;
+                if inv {
+                    inv_ins_event += 1;
+                    inv_ins_count += len;
+                } else {
+                    ins_event += 1;
+                    ins_count += len;
+                }
             }
             'D' => {
-                // if result_len != 0 {
-                //     cigar_string.push_str(&result_len.to_string());
-                //     cigar_string.push('M');
-                // }
-                del_count += len;
-                // cigar_string.push_str(&len.to_string());
-                // cigar_string.push(k);
-                // result_len = 0;
+                if inv {
+                    inv_del_event += 1;
+                    inv_del_count += len;
+                } else {
+                    del_event += 1;
+                    del_count += len;
+                }
             }
             'X' => {
                 mismatch_count += len;
-                // result_len += len;
-                // cigar_string.push_str(&len.to_string());
-                // cigar_string.push(k);
             }
             _ => {}
         };
         cigar_string.push_str(&len.to_string());
         cigar_string.push(k);
     }
-    // cigar_string.push_str(&result_len.to_string());
-    // cigar_string.push('M');
 
     if with_h {
         cigar_string.push_str(&end.to_string());
@@ -248,9 +257,16 @@ pub fn parse_maf_seq_to_cigar<T: AlignRecord>(rec: &T, with_h: bool) -> Cigar {
     Cigar {
         cigar_string,
         match_count,
-        ins_count,
-        del_count,
         mismatch_count,
+        ins_event,
+        ins_count,
+        del_event,
+        del_count,
+        inv_ins_event,
+        inv_ins_count,
+        inv_del_event,
+        inv_del_count,
+        inv_event,
     }
 }
 
@@ -290,7 +306,6 @@ fn cigar_unit_chain(
         'M' | 'X' | '=' => {
             // will not write unless: [1. size == 0; 2. both no query&target diff]
             if (dataline.size != 0) && (dataline.target_diff + dataline.query_diff != 0) {
-                // TODO: handle IO error
                 wtr.write_all(format!("{}", dataline).as_bytes())?;
             };
             // accumulate size
@@ -354,10 +369,26 @@ pub fn parse_cigar_to_insert<'a, T: AlignRecord>(
 pub fn parse_chain_to_cigar(rec: &ChainRecord, _with_h: bool) -> Cigar {
     let mut cigar_string = String::new();
     let mut match_count = 0;
-    let mut ins_count = 0;
-    let mut del_count = 0;
     let mismatch_count = 0;
+    let mut ins_event = 0;
+    let mut ins_count = 0;
+    let mut del_event = 0;
+    let mut del_count = 0;
+    let mut inv_ins_event = 0;
+    let mut inv_ins_count = 0;
+    let mut inv_del_event = 0;
+    let mut inv_del_count = 0;
+    let mut inv_event = 0;
     let mut current_offset = 0;
+
+    let inv = match rec.query_strand() {
+        crate::parser::common::Strand::Positive => false,
+        crate::parser::common::Strand::Negative => {
+            inv_event = 1;
+            true
+        }
+    };
+
     for dataline in &rec.lines {
         let match_len = dataline.size - current_offset;
         let ins_len = dataline.target_diff;
@@ -370,7 +401,13 @@ pub fn parse_chain_to_cigar(rec: &ChainRecord, _with_h: bool) -> Cigar {
             _ => {
                 cigar_string.push_str(&ins_len.to_string());
                 cigar_string.push('I');
-                ins_count += ins_len as usize;
+                if inv {
+                    inv_ins_event += 1;
+                    inv_ins_count += ins_len as usize;
+                } else {
+                    ins_event += 1;
+                    ins_count += ins_len as usize;
+                }
             }
         };
         match del_len {
@@ -378,7 +415,13 @@ pub fn parse_chain_to_cigar(rec: &ChainRecord, _with_h: bool) -> Cigar {
             _ => {
                 cigar_string.push_str(&del_len.to_string());
                 cigar_string.push('D');
-                del_count += del_len as usize
+                if inv {
+                    inv_del_event += 1;
+                    inv_del_count += del_len as usize;
+                } else {
+                    del_event += 1;
+                    del_count += del_len as usize;
+                }
             }
         }
         current_offset = dataline.size;
@@ -387,7 +430,14 @@ pub fn parse_chain_to_cigar(rec: &ChainRecord, _with_h: bool) -> Cigar {
         cigar_string,
         match_count,
         mismatch_count,
+        ins_event,
         ins_count,
+        del_event,
         del_count,
+        inv_ins_event,
+        inv_ins_count,
+        inv_del_event,
+        inv_del_count,
+        inv_event,
     }
 }
