@@ -6,7 +6,7 @@ use rust_htslib::faidx;
 use std::io;
 use std::io::Write;
 
-pub fn paf2maf<R: io::Read>(
+pub fn paf2maf<R: io::Read + Send>(
     pafreader: &mut PAFReader<R>,
     outputpath: &str,
     t_fa_path: Option<&str>,

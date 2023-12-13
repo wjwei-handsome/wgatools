@@ -15,7 +15,7 @@ pub struct PAFReader<R: io::Read> {
 
 impl<R> PAFReader<R>
 where
-    R: io::Read,
+    R: io::Read + Send,
 {
     /// Create a new PAF parser
     pub fn new(reader: R) -> Self {

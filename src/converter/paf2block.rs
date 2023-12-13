@@ -4,7 +4,7 @@ use crate::utils::output_writer;
 use std::io;
 
 /// Convert a PAF Reader to output a Blocks file
-pub fn paf2blocks<R: io::Read>(pafreader: &mut PAFReader<R>, outputpath: &str) {
+pub fn paf2blocks<R: io::Read + Send>(pafreader: &mut PAFReader<R>, outputpath: &str) {
     // init writer and csv writer for deserializing
     let writer = output_writer(outputpath);
     let mut wtr = csv::WriterBuilder::new()
