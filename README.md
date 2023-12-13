@@ -20,15 +20,15 @@
 - [x] PAF2MAF
 - [x] Chain2MAF
 - [x] Chain2PAF
-- [x] Call Variants from MAF [In Discussion]
+- [x] Call Variants from MAF
 - [x] Visualize MAF file in terminal
 - [x] Extract regions from MAF file
 - [x] Build MAF index
+- [x] Statistics of MAF/PAF file
 
 ### WHAT WILL DO IN FUTURE
 
 - [ ] SAM converter [really need?]
-- [ ] Call variants and statistics/visualize them
 - [ ] Local improvement of alignment by re-alignment
 - [ ] MAF -> GAF -> HAL
 - [ ] for BIG MAF, should optimize
@@ -42,10 +42,16 @@ cd wgatools
 cargo build --release
 ```
 
+or just install from git:
+
+```shell
+cargo install --git https://github.com/wjwei-handsome/wgatools.git
+```
+
 ### Usages
 
 ```shell
-> ./target/release/wgatools
+> wgatools
 wgatools -- a cross-platform and ultrafast toolkit for Whole Genome Alignment Files manipulation
 
 Version: 0.1.0
@@ -65,7 +71,8 @@ Commands:
   call       Call Variants from MAF file [aliases: c]
   maf2sam    TEST: maf2sam [aliases: m2s]
   maf-index  Build index for MAF file [aliases: mi]
-  tview      TEST: tview [aliases: tv]
+  tview      View MAF file in terminal [aliases: tv]
+  stat       Statistics for Alignment file [aliases: st]
   help       Print this message or the help of the given subcommand(s)
 
 Options:
@@ -76,7 +83,7 @@ GLOBAL:
   -o, --outfile <OUTFILE>  Output file ("-" for stdout) [default: -]
   -r, --rewrite            Bool, if rewrite output file [default: false]
   -t, --threads <THREADS>  Threads, default 1 [default: 1]
-  -v, --verbose...         Logging level [-v: Info, -vv: Debug, -vvv: Trace]
+  -v, --verbose...         Logging level [-v: Info, -vv: Debug, -vvv: Trace, defalut: Warn]
 ```
 
 > NOTE: If you want to convert into MAF format, you should provide target and query genome sequence files in [.fa/.fa.gz].
@@ -117,11 +124,12 @@ fn main() {
 
 - use `nom` to parse CIGAR string
 - use `rayon` to accelerate the speed of conversions
+- use `ratatui` to visualize MAF file in terminal
 - ...
 
 ## Contributing
 
-Feel free to dive in! [Open an issue](https://github.com/wjwei-handsome/GeneMap/issues/new) or submit PRs.
+Feel free to dive in! [Open an issue](https://github.com/wjwei-handsome/wgatools/issues/new) or submit PRs.
 
 ## License
 
