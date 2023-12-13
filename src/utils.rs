@@ -1,10 +1,12 @@
-use crate::parser::chain::ChainReader;
-use crate::parser::common::FileFormat;
-use crate::parser::maf::MAFReader;
-use crate::parser::paf::PAFReader;
-use crate::tools::caller::call_var_maf;
-use crate::tools::index::{build_index, MafIndex};
-use crate::tools::mafextra::maf_extract_idx;
+use crate::{
+    parser::{chain::ChainReader, common::FileFormat, maf::MAFReader, paf::PAFReader},
+    tools::{
+        caller::call_var_maf,
+        index::{build_index, MafIndex},
+        mafextra::maf_extract_idx,
+        stat::{stat_maf, stat_paf},
+    },
+};
 use log::{error, info, warn};
 use std::error::Error;
 use std::fs::File;
@@ -34,7 +36,7 @@ const BUFFER_SIZE: usize = 32 * 1024;
 pub fn stdin_reader() -> Stdin {
     // check if stdin is empty
     if atty::is(atty::Stream::Stdin) {
-        error!("no input content detected");
+        error!("no input content detected, please add `-h` for help");
         std::process::exit(1);
     } else {
         stdin()
@@ -386,4 +388,59 @@ pub fn wrap_maf_call(
         between,
         sample,
     );
+}
+
+pub fn wrap_stat(
+    format: FileFormat,
+    input: &Option<String>,
+    output: &String,
+    rewrite: bool,
+    each: bool,
+) {
+    outfile_exist(output, rewrite);
+    let input_name = match input {
+        Some(path) => path,
+        None => "stdin",
+    };
+
+    let _output_name = match output.as_str() {
+        "-" => "stdout",
+        path => path,
+    };
+
+    let reader = match get_input_reader(input) {
+        Ok(reader) => reader,
+        Err(why) => {
+            error!("Input Error: {} in {}", why, input_name);
+            std::process::exit(1);
+        }
+    };
+
+    info!("start read {:?} file: {}", format, input_name);
+
+    let mut writer = output_writer(output);
+
+    match format {
+        FileFormat::Maf => {
+            let mafrdr = MAFReader::new(reader);
+            match stat_maf(mafrdr, &mut writer, each) {
+                Ok(_) => {}
+                Err(err) => {
+                    error!("{}", err);
+                    std::process::exit(1);
+                }
+            }
+        }
+        FileFormat::Paf => {
+            let pafrdr = PAFReader::new(reader);
+            match stat_paf(pafrdr, &mut writer, each) {
+                Ok(_) => {}
+                Err(err) => {
+                    error!("{}", err);
+                    std::process::exit(1);
+                }
+            }
+        }
+        _ => {}
+    }
 }

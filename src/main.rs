@@ -4,7 +4,7 @@ use wgalib::log::init_logger;
 use wgalib::tools::tview::tview;
 use wgalib::utils::{
     chain2maf, chain2paf, maf2chain, maf2paf, maf2sam, paf2chain, paf2maf, wrap_build_index,
-    wrap_maf_call, wrap_maf_extract,
+    wrap_maf_call, wrap_maf_extract, wrap_stat,
 };
 
 fn main() {
@@ -75,5 +75,12 @@ fn main() {
                 std::process::exit(1);
             }
         },
+        Commands::Stat {
+            input,
+            format,
+            each,
+        } => {
+            wrap_stat(*format, input, &outfile, rewrite, *each);
+        }
     }
 }

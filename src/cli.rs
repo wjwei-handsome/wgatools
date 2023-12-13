@@ -1,6 +1,8 @@
 use clap::ArgAction;
 use clap::{command, Parser, Subcommand};
 
+use crate::parser::common::FileFormat;
+
 #[derive(Parser)]
 #[command(name = "wgatools")]
 #[command(
@@ -145,6 +147,25 @@ pub enum Commands {
         /// Move step size
         #[arg(required = false, long, short, default_value = "10")]
         step: usize,
+    },
+    /// Statistics for Alignment file
+    #[command(visible_alias = "st", name = "stat")]
+    Stat {
+        /// Input Alignment File, None for STDIN
+        #[arg(required = false)]
+        input: Option<String>,
+        /// Input File format,
+        #[arg(
+            required = false,
+            long,
+            short,
+            default_value = "maf",
+            help = "Input File format, default: MAF [default: maf] [possible values: maf, paf]"
+        )]
+        format: FileFormat,
+        /// Show each block's statistics, default: false
+        #[arg(required = false, long, short, default_value = "false")]
+        each: bool,
     },
 }
 
