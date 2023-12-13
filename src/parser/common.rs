@@ -1,5 +1,6 @@
 use crate::parser::maf::MAFRecord;
 use crate::parser::paf::PafRecord;
+use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -8,7 +9,7 @@ use std::str::FromStr;
 use super::cigar::Cigar;
 
 /// Enum the file types
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, ValueEnum)]
 pub enum FileFormat {
     Maf,
     Sam,
@@ -111,17 +112,17 @@ impl<'a> Default for Block<'a> {
 
 #[derive(Debug, Default)]
 pub struct RecStat {
-    pub aligned_size: usize,  // aggre by each block
-    pub matched: usize,       // agg
-    pub mismatched: usize,    // agg
-    pub ins_event: usize,     // agg
-    pub del_event: usize,     // agg
-    pub ins_size: usize,      // agg
-    pub del_size: usize,      // agg
-    pub inv_ins_event: usize, // agg
-    pub inv_ins_size: usize,  // agg
-    pub inv_del_event: usize, // agg
-    pub inv_del_size: usize,  // agg
+    pub aligned_size: usize,
+    pub matched: usize,
+    pub mismatched: usize,
+    pub ins_event: usize,
+    pub del_event: usize,
+    pub ins_size: usize,
+    pub del_size: usize,
+    pub inv_ins_event: usize,
+    pub inv_ins_size: usize,
+    pub inv_del_event: usize,
+    pub inv_del_size: usize,
     pub inv_event: usize,
     pub inv_size: f32,
 }
