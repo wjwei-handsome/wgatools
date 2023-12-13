@@ -1,3 +1,4 @@
+use super::index::MafIndex;
 use crate::parser::cigar::cigar_cat_ext;
 use crate::parser::common::{AlignRecord, Strand};
 use crate::parser::maf::{MAFReader, MAFRecord};
@@ -18,8 +19,6 @@ use noodles::vcf::{
 };
 use rayon::prelude::*;
 use std::io::{Read, Write};
-
-use super::index::MafIndex;
 
 ///
 ///A example:
