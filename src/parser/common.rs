@@ -5,17 +5,18 @@ use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
 
+use super::cigar::Cigar;
+
 /// Enum the file types
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum FileFormat {
     Maf,
     Sam,
-    Bam,
+    // Bam,
     Paf,
-    Delta,
     Chain,
-    Bedpe,
-    Unknown,
+    // Bedpe,
+    // Unknown,
     Blocks,
 }
 
@@ -108,6 +109,50 @@ impl<'a> Default for Block<'a> {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct RecStat {
+    pub aligned_size: usize,  // aggre by each block
+    pub matched: usize,       // agg
+    pub mismatched: usize,    // agg
+    pub ins_event: usize,     // agg
+    pub del_event: usize,     // agg
+    pub ins_size: usize,      // agg
+    pub del_size: usize,      // agg
+    pub inv_ins_event: usize, // agg
+    pub inv_ins_size: usize,  // agg
+    pub inv_del_event: usize, // agg
+    pub inv_del_size: usize,  // agg
+    pub inv_event: usize,
+    pub inv_size: f32,
+}
+
+// Statistic for each record by CIGAR
+impl From<Cigar> for RecStat {
+    fn from(cigar: Cigar) -> Self {
+        let mut rec_stat = RecStat::default();
+        rec_stat.matched = cigar.match_count;
+        rec_stat.mismatched = cigar.mismatch_count;
+        rec_stat.ins_event = cigar.ins_event;
+        rec_stat.del_event = cigar.del_event;
+        rec_stat.ins_size = cigar.ins_count;
+        rec_stat.del_size = cigar.del_count;
+        rec_stat.inv_ins_event = cigar.inv_ins_event;
+        rec_stat.inv_ins_size = cigar.inv_ins_count;
+        rec_stat.inv_del_event = cigar.inv_del_event;
+        rec_stat.inv_del_size = cigar.inv_del_count;
+        rec_stat.aligned_size =
+            rec_stat.matched + rec_stat.mismatched + rec_stat.del_size + rec_stat.inv_del_size;
+        let query_align_size =
+            rec_stat.matched + rec_stat.mismatched + rec_stat.ins_size + rec_stat.inv_ins_size;
+        rec_stat.inv_event = cigar.inv_event;
+        if rec_stat.inv_event != 0 {
+            rec_stat.inv_size =
+                (rec_stat.aligned_size + query_align_size) as f32 / (rec_stat.inv_event + 1) as f32;
+        };
+        rec_stat
+    }
+}
+
 pub trait AlignRecord {
     fn query_name(&self) -> &str;
     fn query_length(&self) -> u64;
@@ -138,5 +183,8 @@ pub trait AlignRecord {
     }
     fn target_seq(&self) -> &str {
         ""
+    }
+    fn get_stat(&self) -> RecStat {
+        RecStat::default()
     }
 }
