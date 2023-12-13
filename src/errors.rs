@@ -12,7 +12,7 @@ pub struct FileInfo {
     /// The file name
     pub name: String,
     /// The file format
-    pub format: FileFormat,
+    pub format: Option<FileFormat>,
 }
 
 /// The error kinds when parse file/stream
@@ -63,7 +63,7 @@ impl ParseError {
             kind: ParseErrorKind::ParseCigar,
             file_info: FileInfo {
                 name: String::from(""),
-                format,
+                format: Some(format),
             },
         }
     }
@@ -74,7 +74,7 @@ impl ParseError {
             kind: ParseErrorKind::ParseInt,
             file_info: FileInfo {
                 name: String::from(""),
-                format: FileFormat::Unknown,
+                format: None,
             },
         }
     }
@@ -88,7 +88,7 @@ impl ParseError {
             kind: ParseErrorKind::ParseSLine,
             file_info: FileInfo {
                 name: String::from(""),
-                format: FileFormat::Maf,
+                format: Some(FileFormat::Maf),
             },
         }
     }
@@ -107,7 +107,7 @@ impl From<io::Error> for ParseError {
             kind: ParseErrorKind::Io,
             file_info: FileInfo {
                 name: String::new(),
-                format: FileFormat::Unknown,
+                format: None,
             },
         }
     }
@@ -120,7 +120,7 @@ impl From<csv::Error> for ParseError {
             kind: ParseErrorKind::Serde,
             file_info: FileInfo {
                 name: String::new(),
-                format: FileFormat::Unknown,
+                format: None,
             },
         }
     }
@@ -133,7 +133,7 @@ impl From<ParseIntError> for ParseError {
             kind: ParseErrorKind::ParseInt,
             file_info: FileInfo {
                 name: String::new(),
-                format: FileFormat::Unknown,
+                format: None,
             },
         }
     }
