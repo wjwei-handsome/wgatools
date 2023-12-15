@@ -22,29 +22,29 @@ struct Pair {
 
 /// Statistic of a pair, Serialize for output
 #[derive(Debug, Serialize, Deserialize, Default)]
-struct Statistic {
-    ref_name: String,
-    ref_size: u64,
-    ref_start: u64,
-    query_name: String,
-    query_size: u64,
-    query_start: u64,
-    aligned_size: usize, // aggre by each block
-    unaligned_size: u64,
-    identity: f32,
-    similarity: f32,
-    matched: usize,       // agg
-    mismatched: usize,    // agg
-    ins_event: usize,     // agg
-    del_event: usize,     // agg
-    ins_size: usize,      // agg
-    del_size: usize,      // agg
-    inv_event: usize,     // agg
-    inv_size: f32,        // agg
-    inv_ins_event: usize, // agg
-    inv_ins_size: usize,  // agg
-    inv_del_event: usize, // agg
-    inv_del_size: usize,  // agg
+pub struct Statistic {
+    pub ref_name: String,
+    pub ref_size: u64,
+    pub ref_start: u64,
+    pub query_name: String,
+    pub query_size: u64,
+    pub query_start: u64,
+    pub aligned_size: usize, // aggre by each block
+    pub unaligned_size: u64,
+    pub identity: f32,
+    pub similarity: f32,
+    pub matched: usize,       // agg
+    pub mismatched: usize,    // agg
+    pub ins_event: usize,     // agg
+    pub del_event: usize,     // agg
+    pub ins_size: usize,      // agg
+    pub del_size: usize,      // agg
+    pub inv_event: usize,     // agg
+    pub inv_size: f32,        // agg
+    pub inv_ins_event: usize, // agg
+    pub inv_ins_size: usize,  // agg
+    pub inv_del_event: usize, // agg
+    pub inv_del_size: usize,  // agg
 }
 
 // define a type for pair_stat
