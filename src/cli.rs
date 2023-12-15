@@ -167,6 +167,31 @@ pub enum Commands {
         #[arg(required = false, long, short, default_value = "false")]
         each: bool,
     },
+    /// TEST: Plot dotplot for Alignment file
+    #[command(visible_alias = "dp", name = "dotplot")]
+    Dotplot {},
+    /// TETS: Filter records for Alignment file
+    #[command(visible_alias = "fl", name = "filter")]
+    Filter {
+        /// Input Alignment File, None for STDIN
+        #[arg(required = false)]
+        input: Option<String>,
+        /// Input File format,
+        #[arg(
+            required = false,
+            long,
+            short,
+            default_value = "maf",
+            help = "Input File format, default: MAF [default: maf] [possible values: maf, paf]"
+        )]
+        format: FileFormat,
+        /// Min block size
+        #[arg(required = false, long, short = 'b', default_value = "0")]
+        min_block_size: u64,
+        /// Min query size, usually for contigs
+        #[arg(required = false, long, short = 'q', default_value = "0")]
+        min_query_size: u64,
+    },
 }
 
 pub fn make_cli_parse() -> Cli {
