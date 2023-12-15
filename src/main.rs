@@ -4,7 +4,7 @@ use wgalib::log::init_logger;
 use wgalib::tools::tview::tview;
 use wgalib::utils::{
     chain2maf, chain2paf, maf2chain, maf2paf, maf2sam, paf2chain, paf2maf, wrap_build_index,
-    wrap_maf_call, wrap_maf_extract, wrap_stat,
+    wrap_filter, wrap_maf_call, wrap_maf_extract, wrap_stat,
 };
 
 fn main() {
@@ -81,6 +81,24 @@ fn main() {
             each,
         } => {
             wrap_stat(*format, input, &outfile, rewrite, *each);
+        }
+        Commands::Dotplot {} => {
+            wgalib::tools::dotplot::chart();
+        }
+        Commands::Filter {
+            input,
+            format,
+            min_block_size,
+            min_query_size,
+        } => {
+            wrap_filter(
+                *format,
+                input,
+                &outfile,
+                rewrite,
+                *min_block_size,
+                *min_query_size,
+            );
         }
     }
 }

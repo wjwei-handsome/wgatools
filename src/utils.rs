@@ -2,6 +2,7 @@ use crate::{
     parser::{chain::ChainReader, common::FileFormat, maf::MAFReader, paf::PAFReader},
     tools::{
         caller::call_var_maf,
+        filter::{filter_maf, filter_paf},
         index::{build_index, MafIndex},
         mafextra::maf_extract_idx,
         stat::{stat_maf, stat_paf},
@@ -434,6 +435,57 @@ pub fn wrap_stat(
         FileFormat::Paf => {
             let pafrdr = PAFReader::new(reader);
             match stat_paf(pafrdr, &mut writer, each) {
+                Ok(_) => {}
+                Err(err) => {
+                    error!("{}", err);
+                    std::process::exit(1);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+pub fn wrap_filter(
+    format: FileFormat,
+    input: &Option<String>,
+    output: &String,
+    rewrite: bool,
+    min_block_size: u64,
+    min_query_size: u64,
+) {
+    outfile_exist(output, rewrite);
+    let input_name = match input {
+        Some(path) => path,
+        None => "stdin",
+    };
+
+    let reader = match get_input_reader(input) {
+        Ok(reader) => reader,
+        Err(why) => {
+            error!("Input Error: {} in {}", why, input_name);
+            std::process::exit(1);
+        }
+    };
+
+    info!("start read {:?} file: {}", format, input_name);
+
+    let mut writer = output_writer(output);
+
+    match format {
+        FileFormat::Maf => {
+            let mafrdr = MAFReader::new(reader);
+            match filter_maf(mafrdr, &mut writer, min_block_size, min_query_size) {
+                Ok(_) => {}
+                Err(err) => {
+                    error!("{}", err);
+                    std::process::exit(1);
+                }
+            }
+        }
+        FileFormat::Paf => {
+            let pafrdr = PAFReader::new(reader);
+            match filter_paf(pafrdr, &mut writer, min_block_size, min_query_size) {
                 Ok(_) => {}
                 Err(err) => {
                     error!("{}", err);
