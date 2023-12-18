@@ -1,13 +1,12 @@
-use crate::errors::ParseError;
+use crate::errors::WGAError;
 use crate::parser::chain::{ChainDataLine, ChainRecord};
 use crate::parser::common::{AlignRecord, Block};
 use csv::Writer;
 use itertools::Itertools;
 use nom::bytes::complete::{tag, take_till, take_while};
-use nom::character::is_digit;
 use nom::error::Error;
 use nom::multi::fold_many0;
-use nom::IResult;
+use nom::{AsChar, IResult};
 use std::io::Write;
 use std::str;
 
@@ -19,7 +18,7 @@ struct CigarUnit {
 }
 
 /// Parse a cigar unit until the input is empty
-fn parse_cigar_unit(input: &[u8]) -> IResult<&[u8], CigarUnit> {
+fn parse_cigar_unit(input: &str) -> IResult<&str, CigarUnit> {
     // if input is empty, return error to break infinite loop
     if input.is_empty() {
         return Err(nom::Err::Error(Error::new(
@@ -28,25 +27,62 @@ fn parse_cigar_unit(input: &[u8]) -> IResult<&[u8], CigarUnit> {
         )));
     }
 
+    // let input = input.as_bytes();
     // take digits
-    let (input, len) = take_while(is_digit)(input)?;
+    let (input, len) = take_while(AsChar::is_dec_digit)(input)?;
     // take alphabetic
-    let (input, op) = take_till(is_digit)(input)?;
+    let (input, op) = take_till(AsChar::is_dec_digit)(input)?;
 
     // convert len to u64
     // TODO: handle parse error
-    let len = str::from_utf8(len).unwrap().parse::<u64>().unwrap();
+    let len = len.parse::<u64>().unwrap();
 
     let cigar_unit = CigarUnit {
         // TODO: op.len() always === 1, if need a parse err? or pass to match op {}?
-        op: char::from(op[0]),
+        op: char::from(op.as_bytes()[0]),
         len,
     };
     Ok((input, cigar_unit))
 }
 
 /// a phantom
-fn null() {}
+fn null() -> Result<(), WGAError> {
+    Ok(())
+}
+
+fn cigar_unit_block(
+    op: char,
+    count: u64,
+    wtr: &mut Writer<Box<dyn Write>>,
+    block: &mut Block,
+) -> Result<(), WGAError> {
+    match op {
+        'M' => {
+            // move query&target
+            block.query_end += count;
+            block.target_end += count;
+
+            // write and serialize
+            wtr.serialize(&block)?;
+
+            // sync query&target start with end
+            block.query_start = block.query_end;
+            block.target_start = block.target_end;
+        }
+        'I' => {
+            // only move query start&end
+            block.query_end += count;
+            block.query_start += count;
+        }
+        'D' => {
+            // only move target start&end
+            block.target_end += count;
+            block.target_start += count;
+        }
+        _ => {} // TODO: handle `H` for SAM
+    };
+    Ok(())
+}
 
 /// Parse cigar string of a AlignRecord[PafRecord, SamRecord] which includes cg:Z: tag and
 /// write into a blocks file
@@ -55,10 +91,10 @@ fn null() {}
 pub fn parse_cigar_to_blocks<'a, T: AlignRecord>(
     rec: &'a T,
     wtr: &mut Writer<Box<dyn Write>>,
-) -> IResult<&'a [u8], ()> {
+) -> Result<(&'a str, Result<(), WGAError>), WGAError> {
     // get cigar bytes and tags
-    let cigar = rec.get_cigar_bytes();
-    let (cigar, _tag) = tag(b"cg:Z:")(cigar)?;
+    let cigar = rec.get_cigar_str()?;
+    let (cigar, _tag) = tag("cg:Z:")(cigar)?;
 
     // init a original block
     let mut block = Block {
@@ -72,37 +108,9 @@ pub fn parse_cigar_to_blocks<'a, T: AlignRecord>(
     };
 
     // fold cigar bytes into many CigarUnits[#CigarUnit]
-    let (rest, res) = fold_many0(parse_cigar_unit, null, |(), cigarunit| {
-        // get operate counts
-        let count = cigarunit.len;
-        // match operations
-        match cigarunit.op {
-            'M' => {
-                // move query&target
-                block.query_end += count;
-                block.target_end += count;
-
-                // write and serialize
-                wtr.serialize(block).unwrap(); // TODO: handle IO error
-
-                // sync query&target start with end
-                block.query_start = block.query_end;
-                block.target_start = block.target_end;
-            }
-            'I' => {
-                // only move query start&end
-                block.query_end += count;
-                block.query_start += count;
-            }
-            'D' => {
-                // only move target start&end
-                block.target_end += count;
-                block.target_start += count;
-            }
-            _ => {} // TODO: handle `H` for SAM
-        };
+    let (rest, res) = fold_many0(parse_cigar_unit, null, |_, cigarunit| {
+        cigar_unit_block(cigarunit.op, cigarunit.len, wtr, &mut block)
     })(cigar)?;
-
     Ok((rest, res))
 }
 
@@ -113,10 +121,10 @@ pub fn parse_cigar_to_blocks<'a, T: AlignRecord>(
 pub fn parse_cigar_to_chain<'a, T: AlignRecord>(
     rec: &'a T,
     wtr: &mut Box<dyn Write>,
-) -> IResult<&'a [u8], ()> {
+) -> Result<(&'a str, Result<(), WGAError>), WGAError> {
     // get cigar bytes and tag
-    let cigar = rec.get_cigar_bytes();
-    let (cigar, _tag) = tag(b"cg:Z:")(cigar)?;
+    let cigar = rec.get_cigar_str()?;
+    let (cigar, _tag) = tag("cg:Z:")(cigar)?;
 
     // init a ChainDataLine filled 0
     let mut dataline = ChainDataLine {
@@ -125,16 +133,16 @@ pub fn parse_cigar_to_chain<'a, T: AlignRecord>(
         target_diff: 0,
     };
 
+    // try regex for cigar
+
     // fold cigar bytes into many CigarUnits[#CigarUnit]
-    let (rest, res) = fold_many0(parse_cigar_unit, null, |(), cigarunit| {
+    let (rest, res) = fold_many0(parse_cigar_unit, null, |_, cigarunit| {
         // get operate counts
         cigar_unit_chain(cigarunit.op, cigarunit.len, wtr, &mut dataline)
-            .expect("TODO: panic message");
     })(cigar)?;
 
     // After all cigar units write done, the last dataline.size should be wrote
-    wtr.write_all(format!("\n{}", dataline.size).as_bytes())
-        .unwrap(); // TODO: handle IO error
+    wtr.write_all(format!("\n{}", dataline.size).as_bytes())?;
     Ok((rest, res))
 }
 
@@ -274,7 +282,7 @@ pub fn parse_maf_seq_to_cigar<T: AlignRecord>(rec: &T, with_h: bool) -> Cigar {
 pub fn parse_maf_seq_to_chain<T: AlignRecord>(
     rec: &T,
     wtr: &mut Box<dyn Write>,
-) -> Result<(), ParseError> {
+) -> Result<(), WGAError> {
     let seq1_iter = rec.target_seq().chars();
     let seq2_iter = rec.query_seq().chars();
     let group_by_iter = seq1_iter
@@ -301,7 +309,7 @@ fn cigar_unit_chain(
     count: u64,
     wtr: &mut Box<dyn Write>,
     dataline: &mut ChainDataLine,
-) -> Result<(), ParseError> {
+) -> Result<(), WGAError> {
     match op {
         'M' | 'X' | '=' => {
             // will not write unless: [1. size == 0; 2. both no query&target diff]
@@ -327,40 +335,56 @@ fn cigar_unit_chain(
     Ok(())
 }
 
+fn cigar_unit_insert_seq(
+    op: char,
+    count: u64,
+    current_offset: &mut u64,
+    t_seq: &mut String,
+    q_seq: &mut String,
+) -> Result<(), WGAError> {
+    println!("current pos:{}", current_offset);
+    match op {
+        'M' | '=' | 'X' => {
+            // do nothing but move offset
+            *current_offset += count;
+        }
+        'I' => {
+            // insert '-' into target seq
+            let ins_str = "-".repeat(count as usize);
+            t_seq.insert_str(*current_offset as usize, &ins_str);
+            *current_offset += count;
+        }
+        'D' => {
+            // insert '-' into query seq
+            let del_str = "-".repeat(count as usize);
+            q_seq.insert_str(*current_offset as usize, &del_str);
+            *current_offset += count;
+        }
+        _ => {} // TODO: handle 'H' for SAM
+    };
+    Ok(())
+}
+
 /// Parse cigar to insert `-` in MAF sequences
 pub fn parse_cigar_to_insert<'a, T: AlignRecord>(
     rec: &'a T,
     t_seq: &mut String,
     q_seq: &mut String,
-) -> IResult<&'a [u8], ()> {
+) -> Result<(&'a str, Result<(), WGAError>), WGAError> {
     // get cigar bytes and tag
-    let cigar = rec.get_cigar_bytes();
-    let (cigar, _tag) = tag(b"cg:Z:")(cigar)?;
+    let cigar = rec.get_cigar_str()?;
+    let (cigar, _tag) = tag("cg:Z:")(cigar)?;
 
     // fold cigar bytes into many CigarUnits[#CigarUnit]
     let mut current_offset = 0;
-    let (rest, res) = fold_many0(parse_cigar_unit, null, |(), cigarunit| {
-        let op = cigarunit.op;
-        let count = cigarunit.len;
-        match op {
-            'M' | '=' | 'X' => {
-                // do nothing but move offset
-                current_offset += count;
-            }
-            'I' => {
-                // insert '-' into target seq
-                let ins_str = "-".repeat(count as usize);
-                t_seq.insert_str(current_offset as usize, &ins_str);
-                current_offset += count;
-            }
-            'D' => {
-                // insert '-' into query seq
-                let del_str = "-".repeat(count as usize);
-                q_seq.insert_str(current_offset as usize, &del_str);
-                current_offset += count;
-            }
-            _ => {} // TODO: handle 'H' for SAM
-        };
+    let (rest, res) = fold_many0(parse_cigar_unit, null, |_, cigarunit| {
+        cigar_unit_insert_seq(
+            cigarunit.op,
+            cigarunit.len,
+            &mut current_offset,
+            t_seq,
+            q_seq,
+        )
     })(cigar)?;
     Ok((rest, res))
 }
