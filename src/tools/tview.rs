@@ -1,8 +1,6 @@
 use itertools::enumerate;
-use log::error;
 use regex::Regex;
 use std::{
-    error::Error,
     fs::File,
     io::{self, BufReader, Read, Seek},
     rc::Rc,
@@ -18,7 +16,7 @@ use crossterm::{
 };
 use ratatui::{prelude::*, widgets::*};
 
-use crate::parser::maf::MAFReader;
+use crate::{errors::WGAError, parser::maf::MAFReader};
 
 use super::index::MafIndex;
 
@@ -205,26 +203,20 @@ impl MafViewApp<'_, File> {
         }
     }
 
-    fn new(input: &String) -> Result<Self, Box<dyn Error>> {
+    fn new(input: &String) -> Result<Self, WGAError> {
         // creat reader
         let mut mafreader = MAFReader::from_path(input)?;
         // init scroll, fixed
         let mut scroll = Scroll::default();
         let mut fixed = vec![Line::from("pos:"), Line::from("|")];
         // read index
-        let index_file = match File::open(format!("{}.index", input)) {
-            Ok(f) => f,
-            Err(_) => return Err("index file not found, please create it by maf-index".into()),
-        };
+        let index_file = File::open(format!("{}.index", input))?;
         let mafindex: MafIndex = serde_json::from_reader(BufReader::new(index_file))?;
         // create navigation
         let mut navigation = Self::gen_navigation(mafindex);
 
         // init first record
-        let init_maf_rec = match mafreader.records().next() {
-            Some(Ok(mafrec)) => mafrec,
-            _ => return Err("empty maf file".into()),
-        };
+        let init_maf_rec = mafreader.records().next().ok_or(WGAError::EmptyRecord)??;
 
         // init first line as ref line
         let init_sline = &init_maf_rec.slines[0];
@@ -265,15 +257,16 @@ impl MafViewApp<'_, File> {
         Ok(app)
     }
 
-    fn update(&mut self) -> Result<(), Box<dyn Error>> {
+    fn update(&mut self) -> Result<(), WGAError> {
         self.filerdr
             .inner
             .seek(std::io::SeekFrom::Start(self.scroll.seek))?;
         // new mafrec
-        let mafrec = match self.filerdr.records().next() {
-            Some(Ok(mafrec)) => mafrec,
-            _ => return Err("empty maf file".into()),
-        };
+        let mafrec = self
+            .filerdr
+            .records()
+            .next()
+            .ok_or(WGAError::EmptyRecord)??;
         // init scroll
         self.scroll.scroll_init();
         // change ref line
@@ -321,11 +314,12 @@ impl MafViewApp<'_, File> {
         let current_pos = self.scroll.ref_start + self.scroll.scroll as u64;
         let scroll_size = self.scroll.destpos - current_pos;
         self.scroll.scroll_right(scroll_size as usize);
+        self.navigation.show = false;
         Ok(())
     }
 }
 
-pub fn tview(input: &String, step: usize) -> Result<(), Box<dyn Error>> {
+pub fn tview(input: &String, step: usize) -> Result<(), WGAError> {
     // creat app and fill init data
     let app = MafViewApp::new(input)?;
 
@@ -338,7 +332,7 @@ pub fn tview(input: &String, step: usize) -> Result<(), Box<dyn Error>> {
 
     // run app
     let tick_rate = Duration::from_millis(250);
-    let res = run_app(&mut terminal, app, tick_rate, step);
+    run_app(&mut terminal, app, tick_rate, step)?;
 
     // restore terminal
     disable_raw_mode()?;
@@ -349,10 +343,6 @@ pub fn tview(input: &String, step: usize) -> Result<(), Box<dyn Error>> {
     )?;
     terminal.show_cursor()?;
 
-    if let Err(err) = res {
-        error!("{err:?}");
-    }
-
     Ok(())
 }
 
@@ -361,7 +351,7 @@ fn run_app<B: Backend>(
     mut app: MafViewApp<'_, File>,
     tick_rate: Duration,
     step: usize,
-) -> io::Result<()> {
+) -> Result<(), WGAError> {
     let mut last_tick = Instant::now();
     loop {
         terminal.draw(|f| main_ui(f, &mut app))?;
@@ -416,17 +406,7 @@ fn run_app<B: Backend>(
                     }
                     KeyCode::Enter => {
                         if app.navigation.show && app.navigation.input_valid {
-                            match app.update() {
-                                Ok(_) => {
-                                    app.navigation.show = false;
-                                }
-                                Err(err) => {
-                                    return Err(io::Error::new(
-                                        io::ErrorKind::Other,
-                                        format!("{:?}", err),
-                                    ));
-                                }
-                            }
+                            app.update()?;
                         }
                     }
                     _ => {}
@@ -578,7 +558,7 @@ fn ivvec2strvec(invec: &[Iv]) -> Vec<String> {
 }
 
 fn input_valid_update(app: &mut MafViewApp<'_, File>) {
-    let re = Regex::new(r"^[a-zA-Z0-9.-]+:[0-9]+(-[0-9]+)?$").unwrap();
+    let re = Regex::new(r"^[a-zA-Z0-9.@_-]+:[0-9]+(-[0-9]+)?$").unwrap(); // NO ERROR
     match re.is_match(&app.navigation.input[6..]) {
         true => {
             let name = &app.navigation.input[6..].split(':').collect::<Vec<&str>>()[0];
