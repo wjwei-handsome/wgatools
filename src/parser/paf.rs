@@ -1,6 +1,7 @@
 use crate::converter::paf2block::paf2blocks;
 use crate::converter::paf2chain::paf2chain;
 use crate::converter::paf2maf::paf2maf;
+use crate::errors::WGAError;
 use crate::parser::common::{AlignRecord, FileFormat, Strand};
 use csv::{DeserializeRecordsIter, ReaderBuilder};
 use serde::{Deserialize, Serialize};
@@ -133,12 +134,12 @@ impl AlignRecord for PafRecord {
         Strand::Positive
     }
 
-    fn get_cigar_bytes(&self) -> &[u8] {
+    fn get_cigar_str(&self) -> Result<&str, WGAError> {
         self.tags
             .iter()
             .find(|x| x.starts_with("cg:Z:"))
-            .unwrap() // TODO: handle a err
-            .as_bytes()
+            .ok_or(WGAError::CigarTagNotFound)
+            .map(|x| x.as_str())
     }
 
     fn target_align_size(&self) -> u64 {

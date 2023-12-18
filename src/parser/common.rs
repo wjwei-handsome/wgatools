@@ -168,8 +168,8 @@ pub trait AlignRecord {
     fn target_end(&self) -> u64;
     fn target_strand(&self) -> Strand;
     fn target_align_size(&self) -> u64;
-    fn get_cigar_bytes(&self) -> &[u8] {
-        b"*"
+    fn get_cigar_str(&self) -> Result<&str, WGAError> {
+        Ok("*")
     }
     fn get_cigar_string(&self) -> String {
         "*".to_string()
