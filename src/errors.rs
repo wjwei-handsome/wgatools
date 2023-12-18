@@ -1,146 +1,91 @@
 //! The error kinds when process whole genome alignments(wga)
 
-use crate::parser::common::FileFormat;
-use std::error::Error;
-use std::fmt::Formatter;
-use std::num::ParseIntError;
-use std::{fmt, io};
+use crate::tools::mafextra::GenomeRegion;
+use thiserror::Error;
 
-/// Represents what a file and it's format when error occurs
-#[derive(Debug, PartialEq, Clone)]
-pub struct FileInfo {
-    /// The file name
-    pub name: String,
-    /// The file format
-    pub format: Option<FileFormat>,
+// define Error types
+#[derive(Error, Debug)]
+pub enum WGAError {
+    // IO error
+    #[error("IO Error:{0}")]
+    Io(#[from] std::io::Error),
+    // Parse MAF Error
+    #[error("Parse MAF Error By: {0}")]
+    ParseMaf(ParseMafErrKind),
+    #[error("csv dese error")]
+    CsvDeserialize(#[from] csv::Error),
+    #[error("Empty stdin, please add `-h` for help")]
+    EmptyStdin,
+    #[error("File `{0}` already exists, please add `-r` to rewrite it.")]
+    FileReWrite(String),
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+    #[error("json dese error")]
+    SerdeDeserialize(#[from] serde_json::Error),
+    #[error("ThreadPoolBuildError error")]
+    ThreadPoolBuildError(#[from] rayon::ThreadPoolBuildError),
+    #[error("Empty record")]
+    EmptyRecord,
+    #[error("regions or region_file must be specified")]
+    EmptyRegion,
+    #[error("Stdin not allowed here")]
+    StdinNotAllowed,
+    #[error("Parse Genome Region Error By: {0}")]
+    ParseGenomeRegion(ParseGenomeRegionErrKind),
+    #[error("failed region: {0}")]
+    FailedRegion(GenomeRegion),
+    #[error("Duplicate name `{0}` in a record not allowed, please check or use `modname`")]
+    DuplicateName(String),
+    #[error("Format {0} Parse Error, please check")]
+    NomErr(#[from] nom::error::Error<String>),
+    #[error("Parse Chain Error By: {0}")]
+    ParseChain(ParseChainErrKind),
+    #[error("Parse Strand `{0}` Error")]
+    ParseStrand(String),
+    #[error("Parse `{0}` Into Integer Error")]
+    #[from = "ParseIntError"]
+    ParseIntError(String),
+    #[error("Parse `{0}` Into Float Error")]
+    #[from = "ParseFloatError"]
+    ParseFloatError(String),
 }
 
-/// The error kinds when parse file/stream
-#[derive(Debug, PartialEq, Clone)]
-pub enum ParseErrorKind {
-    /// Error when file or stream input/output
-    Io,
-    /// Empty file/stream
-    Empty,
-    /// Serde error when deserialize
-    Serde,
-    /// CIGAR parse error
-    ParseCigar,
-    /// MAF s-line parse error
-    ParseSLine,
-    /// Parse Int error
-    ParseInt,
-}
-
-impl fmt::Display for ParseErrorKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            ParseErrorKind::Io => write!(f, "IO"),
-            ParseErrorKind::Empty => write!(f, "Empty"),
-            ParseErrorKind::Serde => write!(f, "Serde"),
-            ParseErrorKind::ParseCigar => write!(f, "ParseCigar"),
-            ParseErrorKind::ParseSLine => write!(f, "ParseSLine"),
-            ParseErrorKind::ParseInt => write!(f, "ParseInt"),
+impl From<nom::Err<nom::error::Error<&str>>> for WGAError {
+    fn from(value: nom::Err<nom::error::Error<&str>>) -> Self {
+        match value {
+            nom::Err::Error(e) => {
+                WGAError::NomErr(nom::error::Error::new(e.input[..10].to_string(), e.code))
+            }
+            _ => WGAError::Other(anyhow::anyhow!("Other nom Error")),
         }
     }
 }
 
-///The parse error returns
-#[derive(Debug, PartialEq, Clone)]
-pub struct ParseError {
-    /// A description of what went wrong
-    pub msg: String,
-    /// The type of error that occurred
-    pub kind: ParseErrorKind,
-    /// The file and it's format when error occurs
-    pub file_info: FileInfo,
+#[derive(Error, Debug)]
+
+pub enum ParseMafErrKind {
+    #[error("S-line Filed `{0}` Missing")]
+    FiledMissing(String),
+    #[error("Surplus Filed > 7")]
+    SurplusField,
+    // #[error("Parse `{0}` Into Integer Error")]
+    // #[from = "ParseIntError"]
+    // ParseIntError(String),
 }
 
-impl ParseError {
-    pub fn new_parse_cigar_err(format: FileFormat) -> Self {
-        ParseError {
-            msg: String::from("Parse cigar error, please check the format."),
-            kind: ParseErrorKind::ParseCigar,
-            file_info: FileInfo {
-                name: String::from(""),
-                format: Some(format),
-            },
-        }
-    }
-
-    pub fn new_parse_int_err(input: &str) -> Self {
-        ParseError {
-            msg: format!("Parse int error, please check the input: {}", input),
-            kind: ParseErrorKind::ParseInt,
-            file_info: FileInfo {
-                name: String::from(""),
-                format: None,
-            },
-        }
-    }
-
-    pub fn new_parse_maf_err(field: &str) -> Self {
-        ParseError {
-            msg: format!(
-                "Parse maf error, please check this wrong field `{}`.",
-                field
-            ),
-            kind: ParseErrorKind::ParseSLine,
-            file_info: FileInfo {
-                name: String::from(""),
-                format: Some(FileFormat::Maf),
-            },
-        }
-    }
+#[derive(Error, Debug)]
+pub enum ParseChainErrKind {
+    #[error("Chain Line Field `{0}` Missing")]
+    FiledMissing(String),
+    // #[error("Parse `{0}` Into Integer Error")]
+    // #[from = "ParseIntError"]
+    // ParseIntError(String),
 }
 
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "ErrorKind: {} ErrorMsg: {}", self.kind, self.msg)
-    }
-}
-
-impl From<io::Error> for ParseError {
-    fn from(err: io::Error) -> ParseError {
-        ParseError {
-            msg: err.to_string(),
-            kind: ParseErrorKind::Io,
-            file_info: FileInfo {
-                name: String::new(),
-                format: None,
-            },
-        }
-    }
-}
-
-impl From<csv::Error> for ParseError {
-    fn from(err: csv::Error) -> ParseError {
-        ParseError {
-            msg: err.to_string(),
-            kind: ParseErrorKind::Serde,
-            file_info: FileInfo {
-                name: String::new(),
-                format: None,
-            },
-        }
-    }
-}
-
-impl From<ParseIntError> for ParseError {
-    fn from(err: ParseIntError) -> ParseError {
-        ParseError {
-            msg: err.to_string(),
-            kind: ParseErrorKind::ParseInt,
-            file_info: FileInfo {
-                name: String::new(),
-                format: None,
-            },
-        }
-    }
-}
-
-impl Error for ParseError {
-    fn description(&self) -> &str {
-        &self.msg
-    }
+#[derive(Error, Debug)]
+pub enum ParseGenomeRegionErrKind {
+    #[error("Region `{0}` is match the format of `chr:start-end`")]
+    FormatNotMatch(String),
+    #[error("Start `{0}` is larger than end `{1}`")]
+    StartGTEnd(u64, u64),
 }
