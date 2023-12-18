@@ -1,7 +1,10 @@
-use crate::parser::{
-    common::{AlignRecord, RecStat},
-    maf::MAFReader,
-    paf::PAFReader,
+use crate::{
+    errors::WGAError,
+    parser::{
+        common::{AlignRecord, RecStat},
+        maf::MAFReader,
+        paf::PAFReader,
+    },
 };
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -60,21 +63,18 @@ pub fn stat_maf<R: Read + Send>(
     mut reader: MAFReader<R>,
     writer: &mut dyn Write,
     each: bool,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), WGAError> {
     let pair_stat_vec = reader
         .records()
         .par_bridge()
-        .map(|rec| {
-            let rec = match rec {
-                Ok(r) => r,
-                Err(e) => {
-                    return Err(Box::new(e));
-                }
-            };
-            Ok(stat_rec(&rec))
+        .try_fold(Vec::new, |mut acc, rec| {
+            acc.push(stat_rec(&rec?)?);
+            Ok::<Vec<PairStat>, WGAError>(acc)
         })
-        .flatten()
-        .collect::<Vec<_>>();
+        .try_reduce(Vec::new, |mut acc, mut vec| {
+            acc.append(&mut vec);
+            Ok(acc)
+        })?;
 
     write_style_result(pair_stat_vec, writer, each)
 }
@@ -82,33 +82,34 @@ pub fn stat_maf<R: Read + Send>(
 // stat for paf
 // TODO: impl the stat_rec for PAfRecord
 pub fn stat_paf<R: Read + Send>(
-    mut reader: PAFReader<R>,
-    writer: &mut dyn Write,
-    each: bool,
+    mut _reader: PAFReader<R>,
+    _writer: &mut dyn Write,
+    _each: bool,
 ) -> Result<(), Box<dyn Error>> {
-    let pair_stat_vec = reader
-        .records()
-        .par_bridge()
-        .map(|rec| {
-            let rec = match rec {
-                Ok(r) => r,
-                Err(e) => {
-                    return Err(Box::new(e));
-                }
-            };
-            Ok(stat_rec(&rec))
-        })
-        .flatten()
-        .collect::<Vec<_>>();
+    // let pair_stat_vec = reader
+    //     .records()
+    //     .par_bridge()
+    //     .map(|rec| {
+    //         let rec = match rec {
+    //             Ok(r) => r,
+    //             Err(e) => {
+    //                 return Err(Box::new(e));
+    //             }
+    //         };
+    //         Ok(stat_rec(&rec))
+    //     })
+    //     .flatten()
+    //     .collect::<Vec<_>>();
 
-    write_style_result(pair_stat_vec, writer, each)
+    // write_style_result(pair_stat_vec, writer, each)
+    Ok(())
 }
 
 fn write_style_result(
     pair_stat_vec: Vec<PairStat>,
     writer: &mut dyn Write,
     each: bool,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), WGAError> {
     let mut final_stat = match each {
         true => split_final(pair_stat_vec),
         false => merge_final_from_pair(pair_stat_vec),
@@ -223,7 +224,7 @@ fn merge_final_from_pair(pair_stat_vec: Vec<PairStat>) -> Vec<Statistic> {
 }
 
 // stat a record to generate a PairStat
-fn stat_rec<T: AlignRecord>(rec: &T) -> PairStat {
+fn stat_rec<T: AlignRecord>(rec: &T) -> Result<PairStat, WGAError> {
     // get pair
     let ref_name = rec.target_name();
     let ref_size = rec.target_length();
@@ -241,10 +242,10 @@ fn stat_rec<T: AlignRecord>(rec: &T) -> PairStat {
     // get rec_stat
     let rec_stat = rec.get_stat();
 
-    PairStat {
+    Ok(PairStat {
         pair,
         rec_stat,
         ref_start,
         query_start,
-    }
+    })
 }
