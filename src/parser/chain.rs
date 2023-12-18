@@ -35,7 +35,6 @@ where
     pub fn records(&mut self) -> ChainRecords {
         let mut data = String::with_capacity(512);
         self.inner.read_to_string(&mut data).unwrap();
-        println!("get data");
         ChainRecords { inner: data }
     }
 
