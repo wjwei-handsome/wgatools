@@ -59,7 +59,7 @@ impl PAFReader<File> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 /// A PAF record refer to https://github.com/lh3/miniasm/blob/master/PAF.md
 pub struct PafRecord {
     pub query_name: String,
@@ -76,27 +76,6 @@ pub struct PafRecord {
     pub mapq: u64,
     #[serde(default)]
     pub tags: Vec<String>,
-}
-
-/// impl Default for PafRecord
-impl Default for PafRecord {
-    fn default() -> Self {
-        PafRecord {
-            query_name: String::new(),
-            query_length: 0,
-            query_start: 0,
-            query_end: 0,
-            strand: Strand::Positive,
-            target_name: String::new(),
-            target_length: 0,
-            target_start: 0,
-            target_end: 0,
-            matches: 0,
-            block_length: 0,
-            mapq: 0,
-            tags: Vec::new(),
-        }
-    }
 }
 
 /// An iterator struct for PAF records
