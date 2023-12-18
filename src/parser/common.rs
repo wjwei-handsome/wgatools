@@ -1,3 +1,4 @@
+use crate::errors::WGAError;
 use crate::parser::maf::MAFRecord;
 use crate::parser::paf::PafRecord;
 use clap::ValueEnum;
@@ -25,7 +26,7 @@ pub enum FileFormat {
 /// - PAF 1-9 columns
 /// - CHAIN header lines
 /// - MAF header lines
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct SeqInfo {
     pub name: String,
     pub size: u64,
@@ -34,22 +35,23 @@ pub struct SeqInfo {
     pub end: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Copy, Serialize, Deserialize, Eq)]
+#[derive(Debug, Clone, PartialEq, Copy, Serialize, Deserialize, Eq, Default)]
 pub enum Strand {
     #[serde(rename = "+")]
+    #[default]
     Positive,
     #[serde(rename = "-")]
     Negative,
 }
 
 impl FromStr for Strand {
-    type Err = String;
+    type Err = WGAError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "+" => Ok(Strand::Positive),
             "-" => Ok(Strand::Negative),
-            _ => Err(format!("Invalid strand character: {}", s)),
+            _ => Err(WGAError::ParseStrand(s.to_string())),
         }
     }
 }
