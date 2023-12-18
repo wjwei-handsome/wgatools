@@ -1,12 +1,13 @@
-use log::error;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::cmp::{max, min};
 use std::fmt::Display;
 use std::fs::File;
-use std::io::{BufReader, Error, Write};
+use std::io::{BufReader, Write};
 
 use super::index::{IvP, MafIndex};
 
+use crate::errors::{ParseGenomeRegionErrKind, WGAError};
 use crate::parser::maf::{MAFReader, MAFWriter};
 use csv::ReaderBuilder;
 use std::io::Read;
@@ -14,14 +15,14 @@ use std::io::Seek;
 
 use rust_lapper::{Interval, Lapper};
 
-pub fn maf_extract_iter<R: Read>(
-    _regions: &Option<Vec<String>>,
-    _region_file: &Option<String>,
-    _outputpath: &str,
-    _mafreader: &mut MAFReader<R>,
-) {
-    todo!()
-}
+// fn maf_extract_iter<R: Read>(
+//     _regions: &Option<Vec<String>>,
+//     _region_file: &Option<String>,
+//     _outputpath: &str,
+//     _mafreader: &mut MAFReader<R>,
+// ) {
+//     todo!()
+// }
 
 pub fn maf_extract_idx<R: Read + Send + Seek>(
     regions: &Option<Vec<String>>,
@@ -29,22 +30,24 @@ pub fn maf_extract_idx<R: Read + Send + Seek>(
     mafreader: &mut MAFReader<R>,
     mafindex: MafIndex,
     writer: &mut dyn Write,
-) {
-    let input_regions = get_input_regions(regions, region_file);
+) -> Result<Vec<GenomeRegion>, WGAError> {
+    let input_regions = get_input_regions(regions, region_file)?;
     let mut sub_maf_wtr = MAFWriter::new(writer);
     let header = "#maf version=1.6 cmd=maf_extract";
-    sub_maf_wtr.write_header(header.to_owned());
-    extract_sub_blocks_with_idx(mafindex, input_regions, mafreader, &mut sub_maf_wtr);
+    sub_maf_wtr.write_header(header.to_owned())?;
+    let failed_regions =
+        extract_sub_blocks_with_idx(mafindex, input_regions, mafreader, &mut sub_maf_wtr)?;
+    Ok(failed_regions)
 }
 
 fn get_input_regions(
     regions: &Option<Vec<String>>,
     region_file: &Option<String>,
-) -> Vec<GenomeRegion> {
+) -> Result<Vec<GenomeRegion>, WGAError> {
     // judge regions and region_file
+    // acutally it's unnecessary
     if regions.is_none() && region_file.is_none() {
-        error!("regions or region_file must be specified");
-        std::process::exit(1);
+        return Err(WGAError::EmptyRegion);
     }
 
     // init input regions
@@ -53,123 +56,57 @@ fn get_input_regions(
     // read input region_vec
     if let Some(regions) = regions {
         for region in regions {
-            let genome_region = match GenomeRegion::try_from(region.to_string()) {
-                Ok(genome_region) => genome_region,
-                Err(err) => {
-                    error!("{} in {}", err, region);
-                    std::process::exit(1);
-                }
-            };
+            let genome_region = GenomeRegion::try_from(region.to_string())?;
             input_regions.push(genome_region);
         }
     }
 
     // read input region_file
     if let Some(region_file) = region_file {
-        let reader = match File::open(region_file) {
-            Ok(file) => BufReader::new(file),
-            Err(err) => {
-                error!("failed to open region file: {}", err);
-                std::process::exit(1);
-            }
-        };
-        let regions = read_genome_region(reader);
-        match regions {
-            Ok(regions) => {
-                input_regions.extend(regions);
-            }
-            Err(err) => {
-                error!("region file format error: {}", err);
-                std::process::exit(1);
-            }
-        }
+        let reader = BufReader::new(File::open(region_file)?);
+        let regions = read_genome_region(reader)?;
+        input_regions.extend(regions);
     }
-    // println!("{:?}", input_regions);
-    input_regions
+    Ok(input_regions)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct GenomeRegion {
+pub struct GenomeRegion {
     name: String,
     start: u64,
     end: u64,
 }
 
 impl TryFrom<String> for GenomeRegion {
-    type Error = Error;
+    type Error = WGAError;
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        // TODO: use regex to check the format;
-        // TODO: or use trans err.
-        let mut iter = value.split(':');
-        let name = match iter.next() {
-            Some(name) => name.to_string(),
-            None => {
-                return Err(Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "region format error",
-                ))
-            }
-        };
-        let mut iter = match iter.next() {
-            Some(start_end) => start_end.split('-'),
-            None => {
-                return Err(Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "region format error",
-                ))
-            }
-        };
-        let start = match iter.next() {
-            Some(start) => match start.parse::<u64>() {
-                Ok(start) => start,
-                Err(_) => {
-                    return Err(Error::new(
-                        std::io::ErrorKind::InvalidInput,
-                        "region format error",
-                    ))
+        let re = Regex::new(r"^([a-zA-Z0-9.@_-]+):([0-9]+)-([0-9]+)$").unwrap();
+        match re.captures(&value) {
+            Some(caps) => {
+                let name = caps.get(1).unwrap().as_str().to_string();
+                let start = caps.get(2).unwrap().as_str().parse::<u64>().unwrap();
+                let end = caps.get(3).unwrap().as_str().parse::<u64>().unwrap();
+                if start > end {
+                    return Err(WGAError::ParseGenomeRegion(
+                        ParseGenomeRegionErrKind::StartGTEnd(start, end),
+                    ));
                 }
-            },
-            None => {
-                return Err(Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "region format error",
-                ))
+                Ok(GenomeRegion { name, start, end })
             }
-        };
-        let end = match iter.next() {
-            Some(end) => match end.parse::<u64>() {
-                Ok(end) => end,
-                Err(_) => {
-                    return Err(Error::new(
-                        std::io::ErrorKind::InvalidInput,
-                        "region format error",
-                    ))
-                }
-            },
-            None => {
-                return Err(Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "region format error",
-                ))
-            }
-        };
-        if start > end {
-            return Err(Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "region format error",
-            ));
+            None => Err(WGAError::ParseGenomeRegion(
+                ParseGenomeRegionErrKind::FormatNotMatch(value),
+            )),
         }
-        Ok(GenomeRegion { name, start, end })
     }
 }
 
 impl Display for GenomeRegion {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}:{}-{}", self.name, self.start, self.end)
     }
 }
 
-fn read_genome_region<R: Read>(reader: R) -> Result<Vec<GenomeRegion>, csv::Error> {
+fn read_genome_region<R: Read>(reader: R) -> Result<Vec<GenomeRegion>, WGAError> {
     let mut rdr = ReaderBuilder::new()
         .delimiter(b'\t')
         .has_headers(false)
@@ -178,10 +115,9 @@ fn read_genome_region<R: Read>(reader: R) -> Result<Vec<GenomeRegion>, csv::Erro
     for result in rdr.deserialize() {
         let record: GenomeRegion = result?;
         if record.start > record.end {
-            return Err(csv::Error::from(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "region format error",
-            ))); // TODO: should be organized
+            return Err(WGAError::ParseGenomeRegion(
+                ParseGenomeRegionErrKind::StartGTEnd(record.start, record.end),
+            ));
         }
         regions.push(record);
     }
@@ -203,10 +139,10 @@ fn extract_sub_blocks_with_idx<R: Read + Send + Seek, W: Write>(
     regions: Vec<GenomeRegion>,
     mafreader: &mut MAFReader<R>,
     mafwriter: &mut MAFWriter<W>,
-) {
-    let stderr = std::io::stderr();
+) -> Result<Vec<GenomeRegion>, WGAError> {
+    let mut failed_regions = Vec::new();
     // TODO: parallel genearte sub-maf-blocks
-    for givl in regions.iter() {
+    for givl in regions.into_iter() {
         match mafidx.get(&givl.name) {
             Some(item) => {
                 let hit_ivps = &item.ivls;
@@ -217,10 +153,7 @@ fn extract_sub_blocks_with_idx<R: Read + Send + Seek, W: Write>(
                 let ord = item.ord;
                 match find_num {
                     0 => {
-                        stderr
-                            .lock()
-                            .write_all(format!("region `{}` not found\n", givl,).as_bytes())
-                            .unwrap();
+                        failed_regions.push(givl);
                         continue;
                     }
                     _ => {
@@ -239,7 +172,7 @@ fn extract_sub_blocks_with_idx<R: Read + Send + Seek, W: Write>(
                             let g_end = givl.end;
 
                             if g_start <= b_start && g_end >= b_end {
-                                mafwriter.write_record(&mafrec);
+                                mafwriter.write_record(&mafrec)?;
                                 continue;
                             }
 
@@ -248,18 +181,16 @@ fn extract_sub_blocks_with_idx<R: Read + Send + Seek, W: Write>(
 
                             mafrec.slice_block(r_start, r_end, ord);
 
-                            mafwriter.write_record(&mafrec);
+                            mafwriter.write_record(&mafrec)?;
                         }
                     }
                 }
             }
             None => {
-                stderr
-                    .lock()
-                    .write_all(format!("sequence `{}` not found\n", givl.name).as_bytes())
-                    .unwrap();
+                failed_regions.push(givl);
                 continue;
             }
         };
     }
+    Ok(failed_regions)
 }
