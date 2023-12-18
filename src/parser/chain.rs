@@ -1,10 +1,11 @@
 use crate::converter::chain2maf::chain2maf;
 use crate::converter::chain2paf::chain2paf;
-use crate::errors::ParseError;
+use crate::errors::{ParseChainErrKind, WGAError};
 use crate::parser::cigar::parse_chain_to_cigar;
 use crate::parser::common::{AlignRecord, FileFormat, SeqInfo, Strand};
 use crate::parser::maf::MAFRecord;
 use crate::parser::paf::PafRecord;
+use crate::utils::{parse_str2f64, parse_str2u64};
 use nom::bytes::complete::{is_not, tag, take_while};
 use nom::character::complete::{line_ending, not_line_ending};
 use nom::multi::fold_many1;
@@ -34,6 +35,7 @@ where
     pub fn records(&mut self) -> ChainRecords {
         let mut data = String::with_capacity(512);
         self.inner.read_to_string(&mut data).unwrap();
+        println!("get data");
         ChainRecords { inner: data }
     }
 
@@ -77,7 +79,7 @@ pub struct ChainRecords {
 }
 
 impl Iterator for ChainRecords {
-    type Item = Result<ChainRecord, String>;
+    type Item = Result<ChainRecord, WGAError>;
     fn next(&mut self) -> Option<Self::Item> {
         if self.inner.is_empty() {
             return None;
@@ -87,30 +89,26 @@ impl Iterator for ChainRecords {
                 self.inner = i.to_string();
                 Some(Ok(r))
             }
-            Err(e) => {
-                let mut msg = format!("{:?}", e);
-                msg.push_str(&self.inner);
-                Some(Err(msg))
-            }
+            Err(e) => Some(Err(e)),
         }
     }
 }
 
 /// Define a chain header
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Header {
     score: f64, // could be u64?
     target: SeqInfo,
     query: SeqInfo,
-    pub(crate) chain_id: usize,
+    pub chain_id: usize,
 }
 
 /// Define a chain data lines
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ChainDataLine {
-    pub(crate) size: u64,
-    pub(crate) query_diff: u64,
-    pub(crate) target_diff: u64,
+    pub size: u64,
+    pub query_diff: u64,
+    pub target_diff: u64,
 }
 
 impl fmt::Display for ChainDataLine {
@@ -190,21 +188,104 @@ impl fmt::Display for Header {
     }
 }
 
-fn parse_header(input: &str) -> Result<Header, ParseError> {
+fn parse_header(input: &str) -> Result<Header, WGAError> {
     let mut iter = input.split_whitespace();
-    // let _ = iter.next().unwrap(); // skip chain
-    let score = iter.next().unwrap().parse::<f64>().unwrap();
-    let target_name = iter.next().unwrap();
-    let target_size = iter.next().unwrap().parse::<u64>().unwrap();
-    let target_strand = iter.next().unwrap().parse::<Strand>().unwrap();
-    let target_start = iter.next().unwrap().parse::<u64>().unwrap();
-    let target_end = iter.next().unwrap().parse::<u64>().unwrap();
-    let query_name = iter.next().unwrap();
-    let query_size = iter.next().unwrap().parse::<u64>().unwrap();
-    let query_strand = iter.next().unwrap().parse::<Strand>().unwrap();
-    let query_start = iter.next().unwrap().parse::<u64>().unwrap();
-    let query_end = iter.next().unwrap().parse::<u64>().unwrap();
-    let chain_id = iter.next().unwrap().parse::<usize>().unwrap();
+    let score = match iter.next() {
+        Some(score) => parse_str2f64(score)?,
+        None => {
+            return Err(WGAError::ParseChain(ParseChainErrKind::FiledMissing(
+                "score".to_string(),
+            )))
+        }
+    };
+    let target_name = match iter.next() {
+        Some(target_name) => target_name,
+        None => {
+            return Err(WGAError::ParseChain(ParseChainErrKind::FiledMissing(
+                "target_name".to_string(),
+            )))
+        }
+    };
+    let target_size = match iter.next() {
+        Some(target_size) => parse_str2u64(target_size)?,
+        None => {
+            return Err(WGAError::ParseChain(ParseChainErrKind::FiledMissing(
+                "target_size".to_string(),
+            )))
+        }
+    };
+    let target_strand = match iter.next() {
+        Some(target_strand) => target_strand.parse::<Strand>()?,
+        None => {
+            return Err(WGAError::ParseChain(ParseChainErrKind::FiledMissing(
+                "target_strand".to_string(),
+            )))
+        }
+    };
+    let target_start = match iter.next() {
+        Some(target_start) => parse_str2u64(target_start)?,
+        None => {
+            return Err(WGAError::ParseChain(ParseChainErrKind::FiledMissing(
+                "target_start".to_string(),
+            )))
+        }
+    };
+    let target_end = match iter.next() {
+        Some(target_end) => parse_str2u64(target_end)?,
+        None => {
+            return Err(WGAError::ParseChain(ParseChainErrKind::FiledMissing(
+                "target_end".to_string(),
+            )))
+        }
+    };
+    let query_name = match iter.next() {
+        Some(query_name) => query_name,
+        None => {
+            return Err(WGAError::ParseChain(ParseChainErrKind::FiledMissing(
+                "query_name".to_string(),
+            )))
+        }
+    };
+    let query_size = match iter.next() {
+        Some(query_size) => parse_str2u64(query_size)?,
+        None => {
+            return Err(WGAError::ParseChain(ParseChainErrKind::FiledMissing(
+                "query_size".to_string(),
+            )))
+        }
+    };
+    let query_strand = match iter.next() {
+        Some(query_strand) => query_strand.parse::<Strand>()?,
+        None => {
+            return Err(WGAError::ParseChain(ParseChainErrKind::FiledMissing(
+                "query_strand".to_string(),
+            )))
+        }
+    };
+    let query_start = match iter.next() {
+        Some(query_start) => parse_str2u64(query_start)?,
+        None => {
+            return Err(WGAError::ParseChain(ParseChainErrKind::FiledMissing(
+                "query_start".to_string(),
+            )))
+        }
+    };
+    let query_end = match iter.next() {
+        Some(query_end) => parse_str2u64(query_end)?,
+        None => {
+            return Err(WGAError::ParseChain(ParseChainErrKind::FiledMissing(
+                "query_end".to_string(),
+            )))
+        }
+    };
+    let chain_id = match iter.next() {
+        Some(chain_id) => parse_str2u64(chain_id)? as usize,
+        None => {
+            return Err(WGAError::ParseChain(ParseChainErrKind::FiledMissing(
+                "chain_id".to_string(),
+            )))
+        }
+    };
     Ok(Header {
         score,
         target: SeqInfo {
@@ -225,46 +306,64 @@ fn parse_header(input: &str) -> Result<Header, ParseError> {
     })
 }
 
+// helper function for chain_parser, terminated if meet another "chain"
 fn line_not_chain(i: &str) -> IResult<&str, &str> {
     terminated(is_not("chain\n"), line_ending)(i)
 }
 
-fn parse_chain_data_line(input: &str) -> IResult<&str, Vec<ChainDataLine>> {
+// parse line to ChainDataLine
+fn parse_line_to_cdl(line: &str) -> Result<ChainDataLine, WGAError> {
+    let mut dataline = line.split_whitespace();
+    let size = parse_str2u64(dataline.next().ok_or(WGAError::ParseChain(
+        ParseChainErrKind::FiledMissing("size".to_string()),
+    ))?)?;
+    let query_diff = match dataline.next() {
+        Some(query_diff) => parse_str2u64(query_diff)?,
+        None => 0u64,
+    };
+    let target_diff = match dataline.next() {
+        Some(target_diff) => parse_str2u64(target_diff)?,
+        None => 0u64,
+    };
+    Ok(ChainDataLine {
+        size,
+        query_diff,
+        target_diff,
+    })
+}
+
+// helper function for chain_parser, fold_many1
+fn init_res_vec_cdl() -> Result<Vec<ChainDataLine>, WGAError> {
+    let res_vec = Vec::new();
+    Ok(res_vec)
+}
+
+fn parse_chain_data_line(
+    input: &str,
+) -> Result<(&str, Result<Vec<ChainDataLine>, WGAError>), WGAError> {
     fold_many1(
         line_not_chain,
-        Vec::new,
-        |mut acc: Vec<ChainDataLine>, item: &str| {
-            let mut dataline = item.split_whitespace();
-            let size = dataline.next().unwrap().parse::<u64>().unwrap();
-            let query_diff = match dataline.next() {
-                Some(query_diff) => query_diff.parse::<u64>().unwrap(),
-                None => 0u64,
-            };
-            let target_diff = match dataline.next() {
-                Some(target_diff) => target_diff.parse::<u64>().unwrap(),
-                None => 0u64,
-            };
-            acc.push(ChainDataLine {
-                size,
-                query_diff,
-                target_diff,
-            });
+        init_res_vec_cdl,
+        |mut acc: Result<Vec<ChainDataLine>, WGAError>, item| {
+            if let Ok(v) = acc.as_mut() {
+                v.push(parse_line_to_cdl(item)?)
+            }
             acc
         },
     )(input)
+    .map_err(|e| e.into())
 }
 
-fn chain_parser(input: &str) -> IResult<&str, ChainRecord> {
+// parse chain record, return rest input and a ChainRecord
+fn chain_parser(input: &str) -> Result<(&str, ChainRecord), WGAError> {
     let (input, _) = tag("chain")(input)?;
     let (input, header_line) = not_line_ending(input)?;
-    let header = parse_header(header_line).unwrap();
+    let header = parse_header(header_line)?;
     let (input, _) = line_ending(input)?;
-    let (input, blocks) = parse_chain_data_line(input)?;
+    let (input, lines) = parse_chain_data_line(input)?;
+    let lines = lines?;
     let (input, _) = take_while(|x| x != 'c')(input)?; // should better
-    let chainrecord = ChainRecord {
-        header,
-        lines: blocks,
-    };
+    let chainrecord = ChainRecord { header, lines };
     Ok((input, chainrecord))
 }
 
