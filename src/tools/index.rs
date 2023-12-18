@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    error::Error,
     fs::File,
     io::{Seek, Write},
 };
@@ -8,12 +7,15 @@ use std::{
 use itertools::enumerate;
 use serde::{Deserialize, Serialize};
 
-use crate::parser::{common::Strand, maf::MAFReader};
+use crate::{
+    errors::WGAError,
+    parser::{common::Strand, maf::MAFReader},
+};
 
 pub fn build_index(
     mafreader: &mut MAFReader<File>,
     idx_wtr: Box<dyn Write>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), WGAError> {
     // init a MAfIndex2 struct
     let mut idx: MafIndex = HashMap::new();
 
@@ -21,12 +23,7 @@ pub fn build_index(
         let offset = mafreader.inner.stream_position()?;
         let record = mafreader.records().next();
         let record = match record {
-            Some(r) => match r {
-                Ok(r) => r,
-                Err(e) => {
-                    return Err(Box::new(e));
-                }
-            },
+            Some(r) => r?,
             None => break,
         };
 
@@ -36,11 +33,7 @@ pub fn build_index(
             if !name_vec.contains(&name) {
                 name_vec.push(name.clone());
             } else {
-                let msg = format!(
-                    "Duplicated name `{}` in MAF not allowed, please check or use `modname`",
-                    name
-                );
-                return Err(msg.into());
+                return Err(WGAError::DuplicateName(name));
             }
             let start = sline.start;
             let end = sline.start + sline.align_size;
@@ -64,7 +57,7 @@ pub fn build_index(
     if !idx.is_empty() {
         serde_json::to_writer(idx_wtr, &idx)?
     } else {
-        return Err("No MAF Record, please check".into());
+        return Err(WGAError::EmptyRecord);
     }
     Ok(())
 }
