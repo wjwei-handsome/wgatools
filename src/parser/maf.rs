@@ -1,10 +1,11 @@
 use crate::converter::maf2bam::maf2sam;
 use crate::converter::maf2chain::maf2chain;
 use crate::converter::maf2paf::maf2paf;
-use crate::errors::ParseError;
+use crate::errors::{ParseMafErrKind, WGAError};
 use crate::parser::cigar::parse_maf_seq_to_cigar;
 use crate::parser::common::{AlignRecord, FileFormat, RecStat, Strand};
 use crate::parser::paf::PafRecord;
+use crate::utils::parse_str2u64;
 
 use log::warn;
 use std::cmp::Ordering;
@@ -128,46 +129,67 @@ impl MAFSLine {
     }
 }
 
-fn str2u64(s: &str) -> Result<u64, ParseError> {
-    // TODO: move to common.rs module
-    match s.parse::<u64>() {
-        Ok(n) => Ok(n),
-        Err(_) => Err(ParseError::new_parse_int_err(s)),
-    }
-}
-
-fn parse_sline(line: String) -> Result<MAFSLine, ParseError> {
+// main parse function for s-line
+fn parse_sline(line: String) -> Result<MAFSLine, WGAError> {
     let mut iter = line.split_whitespace();
     let mode = match iter.next() {
-        Some(mode) => mode.chars().next().unwrap(), // TODO: error handling
-        None => return Err(ParseError::new_parse_maf_err("mode")),
+        Some(mode) => mode.chars().next().unwrap(),
+        None => {
+            return Err(WGAError::ParseMaf(ParseMafErrKind::FiledMissing(
+                "mode".to_string(),
+            )))
+        }
     };
     let name = match iter.next() {
         Some(name) => name.to_string(),
-        None => return Err(ParseError::new_parse_maf_err("name")), // TODO: error handling
+        None => {
+            return Err(WGAError::ParseMaf(ParseMafErrKind::FiledMissing(
+                "name".to_string(),
+            )))
+        }
     };
     let start = match iter.next() {
-        Some(start) => str2u64(start)?,
-        None => return Err(ParseError::new_parse_maf_err("start")),
+        Some(start) => parse_str2u64(start)?,
+        None => {
+            return Err(WGAError::ParseMaf(ParseMafErrKind::FiledMissing(
+                "start".to_string(),
+            )))
+        }
     };
     let align_size = match iter.next() {
-        Some(align_size) => str2u64(align_size)?, // TODO: error handling
-        None => return Err(ParseError::new_parse_maf_err("align size")),
+        Some(align_size) => parse_str2u64(align_size)?,
+        None => {
+            return Err(WGAError::ParseMaf(ParseMafErrKind::FiledMissing(
+                "align_size".to_string(),
+            )))
+        }
     };
     let strand = match iter.next() {
-        Some(strand) => Strand::from(strand), // TODO: error handling
-        None => return Err(ParseError::new_parse_maf_err("strand")),
+        Some(strand) => strand.parse::<Strand>()?,
+        None => {
+            return Err(WGAError::ParseMaf(ParseMafErrKind::FiledMissing(
+                "strand".to_string(),
+            )))
+        }
     };
     let size = match iter.next() {
-        Some(size) => str2u64(size)?,
-        None => return Err(ParseError::new_parse_maf_err("size")),
+        Some(size) => parse_str2u64(size)?,
+        None => {
+            return Err(WGAError::ParseMaf(ParseMafErrKind::FiledMissing(
+                "size".to_string(),
+            )))
+        }
     };
     let seq = match iter.next() {
         Some(seq) => seq.to_string(),
-        None => return Err(ParseError::new_parse_maf_err("sequence")),
+        None => {
+            return Err(WGAError::ParseMaf(ParseMafErrKind::FiledMissing(
+                "seq".to_string(),
+            )))
+        }
     };
     if iter.next().is_some() {
-        return Err(ParseError::new_parse_maf_err("Extra Fields > 8!!"));
+        return Err(WGAError::ParseMaf(ParseMafErrKind::SurplusField));
     };
     Ok(MAFSLine {
         mode,
@@ -178,11 +200,6 @@ fn parse_sline(line: String) -> Result<MAFSLine, ParseError> {
         size,
         seq,
     })
-}
-
-fn sline_from_string(value: String) -> Result<MAFSLine, ParseError> {
-    let s_line = parse_sline(value)?;
-    Ok(s_line)
 }
 
 /// A MAF alignment record refer to https://genome.ucsc.edu/FAQ/FAQformat.html#format5
@@ -261,7 +278,7 @@ pub struct MAFRecords<'a, R: Read + Send> {
 
 /// impl Iterator trait for MAFRecords
 impl<R: Read + Send> Iterator for MAFRecords<'_, R> {
-    type Item = Result<MAFRecord, ParseError>;
+    type Item = Result<MAFRecord, WGAError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let score = 255;
@@ -271,13 +288,14 @@ impl<R: Read + Send> Iterator for MAFRecords<'_, R> {
                     self.next() // skip empty line
                 } else {
                     // start read multi s-lines
+                    // init a maf-record
                     let mut mafrecord = MAFRecord {
-                        // init a maf-record
                         score,
                         slines: Vec::new(),
                     };
-                    let sline = match sline_from_string(line) {
+                    let sline = match parse_sline(line) {
                         Ok(sline) => sline,
+                        // if catch error, return error
                         Err(e) => return Some(Err(e)),
                     };
                     mafrecord.slines.push(sline); // push first s-line
@@ -286,7 +304,7 @@ impl<R: Read + Send> Iterator for MAFRecords<'_, R> {
                         match line {
                             Ok(line) => {
                                 if line.starts_with('s') {
-                                    let sline = match sline_from_string(line) {
+                                    let sline = match parse_sline(line) {
                                         Ok(sline) => sline,
                                         Err(e) => return Some(Err(e)),
                                     };
@@ -433,24 +451,26 @@ where
     }
 
     /// write header
-    pub fn write_header(&mut self, header: String) {
-        writeln!(self.inner, "{}", header).unwrap();
+    pub fn write_header(&mut self, header: String) -> Result<(), WGAError> {
+        writeln!(self.inner, "{}", header)?;
+        Ok(())
     }
 
     /// write records
-    pub fn write_record(&mut self, record: &MAFRecord) {
+    pub fn write_record(&mut self, record: &MAFRecord) -> Result<(), WGAError> {
         // write a-line
         let a_line = format!("a score={}\n", record.score);
-        write!(self.inner, "{}", a_line).unwrap();
+        write!(self.inner, "{}", a_line)?;
         for sline in record.slines.iter() {
             // write s-line
             let s_line = format!(
                 "s\t{}\t{}\t{}\t{}\t{}\t{}",
                 sline.name, sline.start, sline.align_size, sline.strand, sline.size, sline.seq
             );
-            writeln!(self.inner, "{}", s_line).unwrap();
+            writeln!(self.inner, "{}", s_line)?;
         }
         // write a empty line
-        writeln!(self.inner).unwrap();
+        writeln!(self.inner)?;
+        Ok(())
     }
 }
