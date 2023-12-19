@@ -1,4 +1,4 @@
-use log::error;
+use log::{error, info};
 use wgalib::cli::{make_cli_parse, Commands};
 use wgalib::errors::WGAError;
 use wgalib::log::init_logger;
@@ -19,7 +19,7 @@ fn main() {
 }
 
 fn main_entry() -> Result<(), WGAError> {
-    let cli = make_cli_parse(); // TODO: handle parse error
+    let cli = make_cli_parse();
     let verbose = cli.verbose;
 
     init_logger(verbose);
@@ -32,7 +32,7 @@ fn main_entry() -> Result<(), WGAError> {
     let rewrite = cli.rewrite;
 
     // Info log
-    // info!("Process: {:?}", &cli.command);
+    info!("Command: {:?}", &cli.command);
 
     match &cli.command {
         Commands::Maf2Paf { input } => {
