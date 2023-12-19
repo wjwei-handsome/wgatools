@@ -90,6 +90,13 @@ pub enum Commands {
         #[arg(required = false)]
         input: Option<String>,
     },
+    /// Build index for MAF file
+    #[command(visible_alias = "mi", name = "maf-index")]
+    MafIndex {
+        /// Input MAF File
+        #[arg(required = true)]
+        input: String,
+    },
     /// Extract specific region from MAF file with index
     #[command(visible_alias = "me", name = "maf-ext")]
     MafExtract {
@@ -107,8 +114,8 @@ pub enum Commands {
     #[command(visible_alias = "c", name = "call")]
     Call {
         /// Input MAF File
-        #[arg(required = true)]
-        input: String,
+        #[arg(required = false)]
+        input: Option<String>,
         /// Sample name
         #[arg(
             required = false,
@@ -123,20 +130,6 @@ pub enum Commands {
         /// SV length cutoff
         #[arg(required = false, long = "svlen", short = 'l', default_value = "50")]
         svlen: u64,
-    },
-    /// TEST: maf2sam
-    #[command(visible_alias = "m2s", name = "maf2sam")]
-    Maf2Sam {
-        /// Input MAF File, None for STDIN
-        #[arg(required = false)]
-        input: Option<String>,
-    },
-    /// Build index for MAF file
-    #[command(visible_alias = "mi", name = "maf-index")]
-    MafIndex {
-        /// Input MAF File
-        #[arg(required = true)]
-        input: String,
     },
     /// View MAF file in terminal
     #[command(visible_alias = "tv", name = "tview")]
@@ -191,6 +184,13 @@ pub enum Commands {
         /// Min query size, usually for contigs
         #[arg(required = false, long, short = 'q', default_value = "0")]
         min_query_size: u64,
+    },
+    /// TEST: maf2sam
+    #[command(visible_alias = "m2s", name = "maf2sam")]
+    Maf2Sam {
+        /// Input MAF File, None for STDIN
+        #[arg(required = false)]
+        input: Option<String>,
     },
 }
 
