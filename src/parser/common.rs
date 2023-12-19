@@ -174,11 +174,11 @@ pub trait AlignRecord {
     fn get_cigar_string(&self) -> String {
         "*".to_string()
     }
-    fn convert2paf(&self) -> PafRecord {
-        PafRecord::default()
+    fn convert2paf(&self) -> Result<PafRecord, WGAError> {
+        Ok(PafRecord::default())
     }
-    fn convert2maf(&self) -> MAFRecord {
-        MAFRecord::default()
+    fn convert2maf(&self) -> Result<MAFRecord, WGAError> {
+        Ok(MAFRecord::default())
     }
     fn convert2bam(&self, _name_id_map: &HashMap<&str, u64>) {}
     fn query_seq(&self) -> &str {
