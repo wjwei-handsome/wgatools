@@ -461,7 +461,7 @@ fn main_ui(f: &mut Frame, app: &mut MafViewApp<'_, File>) {
         // judge if input is valid
         app.navigation.input_valid = true;
         // update jump to seek/ Destination / ref name from **valid**-input
-        input_valid_update(app);
+        let _ = input_valid_update(app);
 
         // gen 4 split areas
         let two_scroll_one_input_one_msg = gen_two_scroll_one_input_one_msg_area(f);
@@ -557,8 +557,8 @@ fn ivvec2strvec(invec: &[Iv]) -> Vec<String> {
         .collect::<Vec<String>>()
 }
 
-fn input_valid_update(app: &mut MafViewApp<'_, File>) {
-    let re = Regex::new(r"^[a-zA-Z0-9.@_-]+:[0-9]+(-[0-9]+)?$").unwrap(); // NO ERROR
+fn input_valid_update(app: &mut MafViewApp<'_, File>) -> Result<(), WGAError> {
+    let re = Regex::new(r"^[a-zA-Z0-9.@_-]+:[0-9]+(-[0-9]+)?$")?; // NO ERROR
     match re.is_match(&app.navigation.input[6..]) {
         true => {
             let name = &app.navigation.input[6..].split(':').collect::<Vec<&str>>()[0];
@@ -611,6 +611,7 @@ fn input_valid_update(app: &mut MafViewApp<'_, File>) {
             app.navigation.input_valid = false;
         }
     }
+    Ok(())
 }
 
 fn gen_two_scroll_one_input_one_msg_area(f: &mut Frame) -> Rc<[Rect]> {
