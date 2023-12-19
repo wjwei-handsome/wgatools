@@ -223,14 +223,16 @@ impl MAFRecord {
     }
 }
 
-// TODO: impl a derive macro for AlignRecord to cmp by target_start and target_name
+// impl PartialEq for MAFRecord
 impl PartialOrd<Self> for MAFRecord {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
+// impl Ord for MAFRecord
 impl Ord for MAFRecord {
+    // natural order
     fn cmp(&self, other: &Self) -> Ordering {
         let t1_name = self.target_name();
         let t1_start = self.target_start();
