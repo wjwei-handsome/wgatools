@@ -1,16 +1,13 @@
-use crate::converter::maf2bam::maf2sam;
-use crate::converter::maf2chain::maf2chain;
-use crate::converter::maf2paf::maf2paf;
 use crate::errors::{ParseMafErrKind, WGAError};
 use crate::parser::cigar::parse_maf_seq_to_cigar;
-use crate::parser::common::{AlignRecord, FileFormat, RecStat, Strand};
+use crate::parser::common::{AlignRecord, RecStat, Strand};
 use crate::parser::paf::PafRecord;
 use crate::utils::parse_str2u64;
-
+use anyhow::anyhow;
 use log::warn;
 use std::cmp::Ordering;
 use std::fs::File;
-use std::io::{self, Write};
+use std::io::Write;
 use std::io::{BufRead, BufReader, Read};
 
 /// Parser for MAF file format
@@ -24,17 +21,17 @@ where
     R: Read + Send,
 {
     /// Create a new MAF parser
-    pub fn new(reader: R) -> Self {
+    pub fn new(reader: R) -> Result<Self, WGAError> {
         let mut buf_reader = BufReader::new(reader);
         let mut header = String::new();
-        buf_reader.read_line(&mut header).unwrap();
+        buf_reader.read_line(&mut header)?;
         if !header.starts_with('#') {
             warn!("MAF Header is not start with `#`")
         }
-        MAFReader {
+        Ok(MAFReader {
             inner: buf_reader,
             header,
-        }
+        })
     }
 
     /// Iterate over the records in the MAF file
@@ -43,31 +40,15 @@ where
             inner: self.inner.by_ref(),
         }
     }
-
-    /// convert method
-    pub fn convert(&mut self, outputpath: &str, format: FileFormat) {
-        match format {
-            FileFormat::Chain => {
-                maf2chain(self, outputpath);
-            }
-            // FileFormat::Bam => {
-            //     maf2bam(self, outputpath);
-            // }
-            FileFormat::Paf => {
-                maf2paf(self, outputpath);
-            }
-            FileFormat::Sam => {
-                maf2sam(self, outputpath);
-            }
-            _ => {}
-        }
-    }
 }
 
 impl MAFReader<File> {
     /// Create a new PAF parser from a file path
-    pub fn from_path<P: AsRef<std::path::Path>>(path: P) -> io::Result<MAFReader<File>> {
-        File::open(path).map(MAFReader::new)
+    pub fn from_path<P: AsRef<std::path::Path>>(path: P) -> Result<MAFReader<File>, WGAError> {
+        match File::open(path.as_ref()) {
+            Ok(file) => Ok(MAFReader::new(file)?),
+            Err(_) => Err(WGAError::FileNotExist(path.as_ref().to_path_buf())),
+        }
     }
 }
 
@@ -81,7 +62,7 @@ impl MAFReader<File> {
 // s contig 0   12 + 12     ---AGC-CAT-CATTTT
 #[derive(Debug, PartialEq, Eq)]
 pub struct MAFSLine {
-    mode: char,
+    pub mode: char,
     pub name: String,
     pub start: u64,
     pub align_size: u64,
@@ -133,13 +114,16 @@ impl MAFSLine {
 fn parse_sline(line: String) -> Result<MAFSLine, WGAError> {
     let mut iter = line.split_whitespace();
     let mode = match iter.next() {
-        Some(mode) => mode.chars().next().unwrap(),
+        Some(mode) => mode
+            .chars()
+            .next()
+            .ok_or(WGAError::Other(anyhow!("mode is empty"))),
         None => {
             return Err(WGAError::ParseMaf(ParseMafErrKind::FiledMissing(
                 "mode".to_string(),
             )))
         }
-    };
+    }?;
     let name = match iter.next() {
         Some(name) => name.to_string(),
         None => {
@@ -206,7 +190,7 @@ fn parse_sline(line: String) -> Result<MAFSLine, WGAError> {
 /// a pair of a-lines should be a align record
 #[derive(Debug, PartialEq, Eq)]
 pub struct MAFRecord {
-    score: u64,
+    pub score: u64,
     pub slines: Vec<MAFSLine>,
 }
 
@@ -387,7 +371,7 @@ impl AlignRecord for MAFRecord {
         parse_maf_seq_to_cigar(self, false).cigar_string
     }
 
-    fn convert2paf(&self) -> PafRecord {
+    fn convert2paf(&self) -> Result<PafRecord, WGAError> {
         let cigar = parse_maf_seq_to_cigar(self, false);
         let cigar_string = String::from("cg:Z:") + &cigar.cigar_string;
         let matches = cigar.match_count as u64;
@@ -401,7 +385,7 @@ impl AlignRecord for MAFRecord {
             + cigar.inv_del_count;
         let nm_tag = String::from("NM:i:") + &*edit_dist.to_string();
 
-        PafRecord {
+        Ok(PafRecord {
             query_name: self.query_name().to_string(),
             query_length: self.query_length(),
             query_start: self.query_start(),
@@ -415,7 +399,7 @@ impl AlignRecord for MAFRecord {
             block_length,
             mapq: 255,
             tags: vec![nm_tag, cigar_string],
-        }
+        })
     }
 
     fn query_seq(&self) -> &str {
