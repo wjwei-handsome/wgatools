@@ -215,7 +215,7 @@ pub fn paf2maf<R: Read + Send>(
         match q_strand {
             Strand::Positive => {}
             Strand::Negative => {
-                whole_q_seq = reverse_complement(&whole_q_seq);
+                whole_q_seq = reverse_complement(&whole_q_seq)?;
             }
         }
         // nom the cigar string and insert the `-` to sequence
@@ -306,7 +306,7 @@ pub fn chain2maf<R: Read + Send>(
         match q_strand {
             Strand::Positive => {}
             Strand::Negative => {
-                whole_q_seq = reverse_complement(&whole_q_seq);
+                whole_q_seq = reverse_complement(&whole_q_seq)?;
             }
         }
         // read chain dataline and insert the `-` to sequence
