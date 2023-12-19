@@ -7,7 +7,7 @@ use crate::{
         filter::{filter_chain, filter_maf, filter_paf},
         index::{build_index, MafIndex},
         mafextra::maf_extract_idx,
-        stat::stat_maf,
+        stat::{stat_maf, stat_paf},
     },
 };
 use log::{info, warn};
@@ -331,9 +331,12 @@ pub fn wrap_stat(
             stat_maf(mafrdr, &mut writer, each)?
         }
         FileFormat::Paf => {
-            let _pafrdr = PAFReader::new(reader);
+            let pafrdr = PAFReader::new(reader);
+            stat_paf(pafrdr, &mut writer, each)?
         }
-        _ => {}
+        _ => {
+            return Err(WGAError::NotImplemented);
+        }
     }
     Ok(())
 }
@@ -363,7 +366,9 @@ pub fn wrap_filter(
             let chainrdr = ChainReader::new(reader);
             filter_chain(chainrdr, &mut writer, min_block_size, min_query_size)?
         }
-        _ => {}
+        _ => {
+            return Err(WGAError::NotImplemented);
+        }
     }
     Ok(())
 }

@@ -1,5 +1,6 @@
 use crate::errors::WGAError;
-use crate::parser::common::{AlignRecord, Strand};
+use crate::parser::cigar::parse_paf_to_cigar;
+use crate::parser::common::{AlignRecord, RecStat, Strand};
 use csv::{DeserializeRecordsIter, ReaderBuilder};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
@@ -125,5 +126,11 @@ impl AlignRecord for PafRecord {
 
     fn target_align_size(&self) -> u64 {
         self.block_length
+    }
+
+    fn get_stat(&self) -> Result<RecStat, WGAError> {
+        // just convert cigar to stat
+        let cigar = parse_paf_to_cigar(self)?;
+        Ok(RecStat::from(cigar))
     }
 }

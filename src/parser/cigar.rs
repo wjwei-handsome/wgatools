@@ -450,7 +450,6 @@ pub fn parse_chain_to_cigar(rec: &ChainRecord, _with_h: bool) -> Cigar {
     let mut inv_del_event = 0;
     let mut inv_del_count = 0;
     let mut inv_event = 0;
-    let mut current_offset = 0;
 
     let inv = match rec.query_strand() {
         crate::parser::common::Strand::Positive => false,
@@ -461,7 +460,7 @@ pub fn parse_chain_to_cigar(rec: &ChainRecord, _with_h: bool) -> Cigar {
     };
 
     for dataline in &rec.lines {
-        let match_len = dataline.size - current_offset;
+        let match_len = dataline.size;
         let ins_len = dataline.target_diff;
         let del_len = dataline.query_diff;
         cigar_string.push_str(&match_len.to_string());
@@ -495,7 +494,6 @@ pub fn parse_chain_to_cigar(rec: &ChainRecord, _with_h: bool) -> Cigar {
                 }
             }
         }
-        current_offset = dataline.size;
     }
     Cigar {
         cigar_string,
@@ -511,4 +509,85 @@ pub fn parse_chain_to_cigar(rec: &ChainRecord, _with_h: bool) -> Cigar {
         inv_del_count,
         inv_event,
     }
+}
+
+/// Parse CIGAR to Cigar struct
+pub fn parse_paf_to_cigar<T: AlignRecord>(rec: &T) -> Result<Cigar, WGAError> {
+    let cigar_string = String::new();
+    let mut match_count = 0;
+    let mut mismatch_count = 0;
+    let mut ins_event = 0;
+    let mut ins_count = 0;
+    let mut del_event = 0;
+    let mut del_count = 0;
+    let mut inv_ins_event = 0;
+    let mut inv_ins_count = 0;
+    let mut inv_del_event = 0;
+    let mut inv_del_count = 0;
+    let mut inv_event = 0;
+
+    let inv = match rec.query_strand() {
+        crate::parser::common::Strand::Positive => false,
+        crate::parser::common::Strand::Negative => {
+            inv_event = 1;
+            true
+        }
+    };
+
+    let cigar = rec.get_cigar_str()?;
+    let (cigar, _tag) = tag("cg:Z:")(cigar)?;
+    let mut current_offset = 0;
+    let (_, res) = fold_many1(
+        parse_cigar_str_tuple,
+        null,
+        |res: Result<(), WGAError>, cigarunit| {
+            if res.is_ok() {
+                let cigarunit = cst2cu(cigarunit)?;
+                match cigarunit.op {
+                    'M' | '=' => {
+                        match_count += cigarunit.len as usize;
+                    }
+                    'X' => {
+                        mismatch_count += cigarunit.len as usize;
+                    }
+                    'I' => {
+                        if inv {
+                            inv_ins_event += 1;
+                            inv_ins_count += cigarunit.len as usize;
+                        } else {
+                            ins_event += 1;
+                            ins_count += cigarunit.len as usize;
+                        }
+                    }
+                    'D' => {
+                        if inv {
+                            inv_del_event += 1;
+                            inv_del_count += cigarunit.len as usize;
+                        } else {
+                            del_event += 1;
+                            del_count += cigarunit.len as usize;
+                        }
+                    }
+                    _ => {}
+                };
+                current_offset += cigarunit.len;
+            }
+            res
+        },
+    )(cigar)?;
+    res?;
+    Ok(Cigar {
+        cigar_string,
+        match_count,
+        mismatch_count,
+        ins_event,
+        ins_count,
+        del_event,
+        del_count,
+        inv_ins_event,
+        inv_ins_count,
+        inv_del_event,
+        inv_del_count,
+        inv_event,
+    })
 }

@@ -10,7 +10,6 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    error::Error,
     io::{Read, Write},
 };
 
@@ -80,29 +79,24 @@ pub fn stat_maf<R: Read + Send>(
 }
 
 // stat for paf
-// TODO: impl the stat_rec for PAfRecord
 pub fn stat_paf<R: Read + Send>(
-    mut _reader: PAFReader<R>,
-    _writer: &mut dyn Write,
-    _each: bool,
-) -> Result<(), Box<dyn Error>> {
-    // let pair_stat_vec = reader
-    //     .records()
-    //     .par_bridge()
-    //     .map(|rec| {
-    //         let rec = match rec {
-    //             Ok(r) => r,
-    //             Err(e) => {
-    //                 return Err(Box::new(e));
-    //             }
-    //         };
-    //         Ok(stat_rec(&rec))
-    //     })
-    //     .flatten()
-    //     .collect::<Vec<_>>();
+    mut reader: PAFReader<R>,
+    writer: &mut dyn Write,
+    each: bool,
+) -> Result<(), WGAError> {
+    let pair_stat_vec = reader
+        .records()
+        .par_bridge()
+        .try_fold(Vec::new, |mut acc, rec| {
+            acc.push(stat_rec(&rec?)?);
+            Ok::<Vec<PairStat>, WGAError>(acc)
+        })
+        .try_reduce(Vec::new, |mut acc, mut vec| {
+            acc.append(&mut vec);
+            Ok(acc)
+        })?;
 
-    // write_style_result(pair_stat_vec, writer, each)
-    Ok(())
+    write_style_result(pair_stat_vec, writer, each)
 }
 
 fn write_style_result(
@@ -240,7 +234,7 @@ fn stat_rec<T: AlignRecord>(rec: &T) -> Result<PairStat, WGAError> {
     };
 
     // get rec_stat
-    let rec_stat = rec.get_stat();
+    let rec_stat = rec.get_stat()?;
 
     Ok(PairStat {
         pair,
