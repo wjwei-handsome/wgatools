@@ -148,13 +148,7 @@ pub enum Commands {
         #[arg(required = false)]
         input: Option<String>,
         /// Input File format,
-        #[arg(
-            required = false,
-            long,
-            short,
-            default_value = "maf",
-            help = "Input File format, default: MAF [default: maf] [possible values: maf, paf]"
-        )]
+        #[arg(required = false, long, short, default_value = "maf")]
         format: FileFormat,
         /// Show each block's statistics, default: false
         #[arg(required = false, long, short, default_value = "false")]
@@ -163,20 +157,14 @@ pub enum Commands {
     /// TEST: Plot dotplot for Alignment file
     #[command(visible_alias = "dp", name = "dotplot")]
     Dotplot {},
-    /// TEST: Filter records for Alignment file
+    /// Filter records for Alignment file
     #[command(visible_alias = "fl", name = "filter")]
     Filter {
         /// Input Alignment File, None for STDIN
         #[arg(required = false)]
         input: Option<String>,
         /// Input File format,
-        #[arg(
-            required = false,
-            long,
-            short,
-            default_value = "maf",
-            help = "Input File format, default: MAF [default: maf] [possible values: maf, paf]"
-        )]
+        #[arg(required = false, long, short, default_value = "maf")]
         format: FileFormat,
         /// Min block size
         #[arg(required = false, long, short = 'b', default_value = "0")]

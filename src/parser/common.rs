@@ -13,13 +13,17 @@ use super::cigar::Cigar;
 #[derive(Debug, PartialEq, Clone, Copy, ValueEnum)]
 pub enum FileFormat {
     Maf,
+    #[value(skip)]
     Sam,
     // Bam,
     Paf,
     Chain,
-    // Bedpe,
-    // Unknown,
+    #[value(skip)]
+    Bedpe,
+    #[value(skip)]
     Blocks,
+    #[value(skip)]
+    Unknown,
 }
 
 /// Represented in:
