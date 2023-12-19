@@ -163,7 +163,7 @@ pub enum Commands {
     /// TEST: Plot dotplot for Alignment file
     #[command(visible_alias = "dp", name = "dotplot")]
     Dotplot {},
-    /// TETS: Filter records for Alignment file
+    /// TEST: Filter records for Alignment file
     #[command(visible_alias = "fl", name = "filter")]
     Filter {
         /// Input Alignment File, None for STDIN
