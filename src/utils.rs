@@ -59,7 +59,7 @@ pub fn parse_str2f64(s: &str) -> Result<f64, WGAError> {
     }
 }
 
-pub fn reverse_complement(input: &str) -> String {
+pub fn reverse_complement(input: &str) -> Result<String, WGAError> {
     let mut output = String::with_capacity(input.len());
     for c in input.chars().rev() {
         match c {
@@ -68,10 +68,10 @@ pub fn reverse_complement(input: &str) -> String {
             'G' => output.push('C'),
             'T' => output.push('A'),
             'N' => output.push('N'),
-            _ => panic!("Invalid character"),
+            _ => return Err(WGAError::InvalidBase(c.to_string())),
         }
     }
-    output
+    Ok(output)
 }
 
 pub fn get_input_reader(input: &Option<String>) -> Result<Box<dyn BufRead + Send>, WGAError> {
