@@ -114,7 +114,7 @@ fn main() {
 
 ### TODO for library
 
-- [ ] Error detection and handling
+- [x] Error detection and handling
 - [ ] Test cases
 - [ ] Documentations
 
@@ -133,4 +133,4 @@ Feel free to dive in! [Open an issue](https://github.com/wjwei-handsome/wgatools
 
 ## License
 
-GPL-3.0 © Weiwenjie
+[MIT License](./LICENSE) © WenjieWei
