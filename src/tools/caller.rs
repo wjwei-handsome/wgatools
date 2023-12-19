@@ -1,7 +1,8 @@
-use super::index::MafIndex;
+use crate::errors::WGAError;
 use crate::parser::cigar::cigar_cat_ext;
 use crate::parser::common::{AlignRecord, Strand};
 use crate::parser::maf::{MAFReader, MAFRecord};
+use crate::tools::index::MafIndex;
 use itertools::Itertools;
 use noodles::vcf;
 use noodles::vcf::{
@@ -17,6 +18,7 @@ use noodles::vcf::{
     },
     Header, Record,
 };
+use rayon::iter::ParallelIterator;
 use rayon::prelude::*;
 use std::io::{Read, Write};
 
@@ -28,7 +30,51 @@ use std::io::{Read, Write};
 /// within alignment: snp | ins | del | tandem expansion | tandem contraction | Repeat expansion | Repeat contraction
 /// between alignment: INS | DEL | Repeat expansion | Repeat contraction
 
-fn build_header(sample_name: &str) -> Header {
+// main function, it return a Result<(), WGAErr>
+// NOTE: but other functions took anyhow, bucause noodles::vcf's error' organization is too complex
+// and it will not be error in 99.9% cases
+pub fn call_var_maf<R: Read + Send>(
+    mafreader: &mut MAFReader<R>,
+    mafindex: Option<MafIndex>,
+    writer: &mut dyn Write,
+    if_snp: bool,
+    svlen_cutoff: u64,
+    _between: bool,
+    sample: Option<&str>,
+) -> Result<(), WGAError> {
+    let mut vcf_wtr = vcf::Writer::new(writer);
+    let sample = sample.unwrap_or("sample");
+    let mut header = build_header(sample)?;
+
+    let mut mafrecords = mafreader
+        .records()
+        .par_bridge()
+        .collect::<Result<Vec<_>, WGAError>>()?;
+    // if sort
+    mafrecords.sort();
+    let within_var_recs = mafrecords
+        .par_iter()
+        .try_fold(Vec::new, |mut acc, rec| {
+            let var_recs = call_within_var(rec, if_snp, svlen_cutoff)?;
+            acc.extend(var_recs);
+            Ok::<Vec<Record>, WGAError>(acc)
+        })
+        .try_reduce(Vec::new, |mut acc, mut vec| {
+            acc.append(&mut vec);
+            Ok(acc)
+        })?;
+
+    // add contig to header
+    add_header_contig(mafindex, &mut header)?;
+
+    vcf_wtr.write_header(&header)?;
+    for rec in within_var_recs {
+        vcf_wtr.write_record(&header, &rec)?;
+    }
+    Ok(())
+}
+
+fn build_header(sample_name: &str) -> anyhow::Result<Header> {
     let svlen_id = infokey::SV_LENGTHS;
     let svlen_info = Map::<Info>::from(&svlen_id);
 
@@ -38,21 +84,21 @@ fn build_header(sample_name: &str) -> Header {
     let end_id = infokey::END_POSITION;
     let end_info = Map::<Info>::from(&end_id);
 
-    let inv_nest_id = "INV_NEST".parse::<infokey::Key>().unwrap();
+    let inv_nest_id = "INV_NEST".parse::<infokey::Key>()?;
     let inv_nest_info = Map::<Info>::new(
         Number::Count(1),
         infotype::String,
         "Varations nested within inversion",
     );
 
-    let queryinfo_id = "QI".parse::<gtkey::Key>().unwrap();
+    let queryinfo_id = "QI".parse::<gtkey::Key>()?;
     let queryinfo_info =
         Map::<Format>::new(Number::Count(1), fmttype::String, "Query informations");
 
     let gt_id = gtkey::GENOTYPE;
     let gt_format = Map::<Format>::from(&gt_id);
 
-    Header::builder()
+    Ok(Header::builder()
         .add_info(svlen_id, svlen_info)
         .add_info(svtype_id, svtype_info)
         .add_info(end_id, end_info)
@@ -60,33 +106,10 @@ fn build_header(sample_name: &str) -> Header {
         .add_format(queryinfo_id, queryinfo_info)
         .add_format(gt_id, gt_format)
         .add_sample_name(sample_name)
-        .build()
+        .build())
 }
 
-pub fn call_var_maf<R: Read + Send>(
-    mafreader: &mut MAFReader<R>,
-    mafindex: Option<MafIndex>,
-    writer: &mut dyn Write,
-    if_snp: bool,
-    svlen_cutoff: u64,
-    _between: bool,
-    sample: Option<&str>,
-) {
-    let mut vcf_wtr = vcf::Writer::new(writer);
-    let sample = sample.unwrap_or("sample");
-    let mut header = build_header(sample);
-
-    let mut mafrecords = mafreader
-        .records()
-        .map(|rec| rec.unwrap())
-        .collect::<Vec<_>>();
-    // if sort
-    mafrecords.sort();
-    let within_var_recs = mafrecords
-        .par_iter()
-        .map(|mafrec| call_within_var(mafrec, if_snp, svlen_cutoff))
-        .flatten()
-        .collect::<Vec<_>>();
+fn add_header_contig(mafindex: Option<MafIndex>, header: &mut Header) -> anyhow::Result<()> {
     if let Some(mafindex) = mafindex {
         let mut contig_vec: Vec<(String, u64)> = Vec::new();
         for (name, item) in mafindex {
@@ -100,18 +123,10 @@ pub fn call_var_maf<R: Read + Send>(
         for (name, size) in contig_vec {
             let mut contigmap = Map::<Contig>::new();
             *contigmap.length_mut() = Some(size as usize);
-            header
-                .contigs_mut()
-                .insert(name.parse().unwrap(), contigmap);
+            header.contigs_mut().insert(name.parse()?, contigmap);
         }
     }
-
-    vcf_wtr.write_header(&header).expect("TODO: panic message");
-    for rec in within_var_recs {
-        vcf_wtr
-            .write_record(&header, &rec)
-            .expect("TODO: panic message");
-    }
+    Ok(())
 }
 
 fn get_variant_rec(
@@ -121,13 +136,12 @@ fn get_variant_rec(
     alt_base: &str,
     info: Option<&str>,
     format: Option<&str>,
-) -> Record {
-    // let keys = "GT".parse().unwrap();
+) -> anyhow::Result<Record> {
     // let genotypes = Genotypes::new(keys, vec![vec![Some(Value::from("1|1"))]]);
 
     let genotypes = match format {
-        Some(format) => format.parse().unwrap(),
-        None => "GT\t1|1".parse().unwrap(),
+        Some(format) => format.parse()?,
+        None => "GT\t1|1".parse()?,
     };
 
     let infos: recinfo = match info {
@@ -137,18 +151,21 @@ fn get_variant_rec(
         },
         None => recinfo::default(),
     };
-    Record::builder()
-        .set_chromosome(chro.parse().unwrap())
+    Ok(Record::builder()
+        .set_chromosome(chro.parse()?)
         .set_position(Position::from(pos))
-        .set_reference_bases(ref_base.parse().unwrap())
-        .set_alternate_bases(alt_base.parse().unwrap())
+        .set_reference_bases(ref_base.parse()?)
+        .set_alternate_bases(alt_base.parse()?)
         .set_info(infos)
         .set_genotypes(genotypes)
-        .build()
-        .unwrap()
+        .build()?)
 }
 
-fn call_within_var(mafrec: &MAFRecord, if_snp: bool, svlen_cutoff: u64) -> Vec<Record> {
+fn call_within_var(
+    mafrec: &MAFRecord,
+    if_snp: bool,
+    svlen_cutoff: u64,
+) -> Result<Vec<Record>, WGAError> {
     // target:ACG-TTTGATGCTAGCT---ACG
     // query :ACCATTT--TGCTAACTGGGACG
 
@@ -194,7 +211,7 @@ fn call_within_var(mafrec: &MAFRecord, if_snp: bool, svlen_cutoff: u64) -> Vec<R
             Some(&info),
             Some(&queryinfo),
         );
-        var_recs.push(record);
+        var_recs.push(record?);
     }
 
     let t_seq_iter = mafrec.target_seq().chars();
@@ -248,7 +265,7 @@ fn call_within_var(mafrec: &MAFRecord, if_snp: bool, svlen_cutoff: u64) -> Vec<R
                         Some(&info),
                         Some(&queryinfo),
                     );
-                    var_recs.push(record);
+                    var_recs.push(record?);
                 }
                 query_current_offset += len;
             }
@@ -282,7 +299,7 @@ fn call_within_var(mafrec: &MAFRecord, if_snp: bool, svlen_cutoff: u64) -> Vec<R
                         Some(&info),
                         Some(&queryinfo),
                     );
-                    var_recs.push(record);
+                    var_recs.push(record?);
                 }
                 target_current_offset += len;
             }
@@ -305,7 +322,7 @@ fn call_within_var(mafrec: &MAFRecord, if_snp: bool, svlen_cutoff: u64) -> Vec<R
                             None,
                             None,
                         );
-                        var_recs.push(record);
+                        var_recs.push(record?);
                         target_current_offset += 1;
                         query_current_offset += 1;
                     }
@@ -317,5 +334,5 @@ fn call_within_var(mafrec: &MAFRecord, if_snp: bool, svlen_cutoff: u64) -> Vec<R
             _ => {}
         }
     }
-    var_recs
+    Ok(var_recs)
 }
