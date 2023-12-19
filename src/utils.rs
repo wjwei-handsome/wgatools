@@ -1,18 +1,63 @@
 use crate::{
+    converter::{chain2maf, chain2paf, maf2chain, maf2paf, maf2sam, paf2chain, paf2maf},
+    errors::WGAError,
     parser::{chain::ChainReader, common::FileFormat, maf::MAFReader, paf::PAFReader},
     tools::{
         caller::call_var_maf,
-        filter::{filter_maf, filter_paf},
+        filter::{filter_chain, filter_maf, filter_paf},
         index::{build_index, MafIndex},
         mafextra::maf_extract_idx,
-        stat::{stat_maf, stat_paf},
+        stat::stat_maf,
     },
 };
-use log::{error, info, warn};
-use std::error::Error;
-use std::fs::File;
+use log::{info, warn};
 use std::io::{stdin, stdout, BufRead, BufReader, BufWriter, Stdin, Write};
 use std::path::Path;
+use std::{fs::File, path::PathBuf};
+
+// TODO : define a pub type WResult = Result<(), WGAError>;
+
+const BUFFER_SIZE: usize = 32 * 1024;
+
+type RdrWtr = (Box<dyn BufRead + Send>, Box<dyn Write>);
+fn prepare_rdr_wtr(
+    input: &Option<String>,
+    output: &str,
+    rewrite: bool,
+) -> Result<RdrWtr, WGAError> {
+    // get input name for INFO
+    let input_name = match input {
+        Some(path) => path,
+        None => "stdin",
+    };
+    info!("start read file: `{}`", input_name);
+
+    // init writer and check if output file exists
+    let writer = get_output_writer(output, rewrite)?;
+    let output_name = match output {
+        "-" => "stdout",
+        path => path,
+    };
+    info!("start write file: `{}`", output_name);
+
+    // get a reader
+    let reader = get_input_reader(input)?;
+    Ok((reader, writer))
+}
+
+pub fn parse_str2u64(s: &str) -> Result<u64, WGAError> {
+    match s.parse::<u64>() {
+        Ok(n) => Ok(n),
+        Err(_) => Err(WGAError::ParseIntError(s.to_string())),
+    }
+}
+
+pub fn parse_str2f64(s: &str) -> Result<f64, WGAError> {
+    match s.parse::<f64>() {
+        Ok(n) => Ok(n),
+        Err(_) => Err(WGAError::ParseFloatError(s.to_string())),
+    }
+}
 
 pub fn reverse_complement(input: &str) -> String {
     let mut output = String::with_capacity(input.len());
@@ -29,49 +74,45 @@ pub fn reverse_complement(input: &str) -> String {
     output
 }
 
-// refer from rustybam, thanks @Mitchell R. Vollger <mrvollger@gmail.com>
-type DynResult<T> = Result<T, Box<dyn Error + 'static>>;
-const BUFFER_SIZE: usize = 32 * 1024;
-
-/// rational stdin reader: if stdin is empty, exit with error
-pub fn stdin_reader() -> Stdin {
-    // check if stdin is empty
-    if atty::is(atty::Stream::Stdin) {
-        error!("no input content detected, please add `-h` for help");
-        std::process::exit(1);
-    } else {
-        stdin()
-    }
-}
-
-/// Get a buffer-read input reader from stdin or a file
-pub fn get_input_reader(input: &Option<String>) -> DynResult<Box<dyn BufRead + Send + 'static>> {
-    let reader: Box<dyn BufRead + Send + 'static> = match input {
+pub fn get_input_reader(input: &Option<String>) -> Result<Box<dyn BufRead + Send>, WGAError> {
+    let reader: Box<dyn BufRead + Send> = match input {
         Some(path) => {
             if path == "-" {
-                Box::new(BufReader::with_capacity(BUFFER_SIZE, stdin_reader()))
+                Box::new(BufReader::with_capacity(BUFFER_SIZE, stdin_reader()?))
             } else {
-                Box::new(BufReader::with_capacity(BUFFER_SIZE, File::open(path)?))
+                match File::open(path) {
+                    Ok(file) => Box::new(BufReader::with_capacity(BUFFER_SIZE, file)),
+                    Err(_) => return Err(WGAError::FileNotExist(PathBuf::from(path))),
+                }
             }
         }
-        None => Box::new(BufReader::with_capacity(BUFFER_SIZE, stdin_reader())),
+        None => Box::new(BufReader::with_capacity(BUFFER_SIZE, stdin_reader()?)),
     };
     Ok(reader)
 }
 
-/// get a output writer including stdout and file writer
-// TODO: handle IO error
-pub fn output_writer(outputpath: &str) -> Box<dyn Write> {
-    if outputpath == "-" {
-        Box::new(stdout())
+/// rational stdin reader: if stdin is empty, exit with error
+fn stdin_reader() -> Result<Stdin, WGAError> {
+    // check if stdin is empty
+    if atty::is(atty::Stream::Stdin) {
+        Err(WGAError::EmptyStdin)
     } else {
-        let file = File::create(outputpath).unwrap();
-        Box::new(BufWriter::new(file))
+        Ok(stdin())
+    }
+}
+
+fn get_output_writer(outputpath: &str, rewrite: bool) -> Result<Box<dyn Write>, WGAError> {
+    check_outfile(outputpath, rewrite)?;
+    if outputpath == "-" {
+        Ok(Box::new(stdout()))
+    } else {
+        let file = File::create(outputpath)?;
+        Ok(Box::new(BufWriter::new(file)))
     }
 }
 
 /// check if output file exists and if rewrite
-fn outfile_exist(output_file: &String, rewrite: bool) {
+fn check_outfile(output_file: &str, rewrite: bool) -> Result<(), WGAError> {
     // check if output file exists
     if output_file != "-" {
         let path = Path::new(output_file);
@@ -81,177 +122,90 @@ fn outfile_exist(output_file: &String, rewrite: bool) {
                 warn!("file {} exist, will rewrite it", output_file);
             } else {
                 // exit
-                error!("file {} exist, use -r to rewrite it", output_file);
-                std::process::exit(1);
+                return Err(WGAError::FileReWrite(output_file.to_string()));
             }
         }
     }
-}
-
-pub fn convert(
-    in_format: FileFormat,
-    out_format: FileFormat,
-    input: &Option<String>,
-    output: &String,
-    target_fa_path: &Option<&str>,
-    query_fa_path: &Option<&str>,
-    rewrite: bool,
-) {
-    outfile_exist(output, rewrite);
-
-    let input_name = match input {
-        Some(path) => path,
-        None => "stdin",
-    };
-
-    let output_name = match output.as_str() {
-        "-" => "stdout",
-        path => path,
-    };
-
-    let reader = match get_input_reader(input) {
-        Ok(reader) => reader,
-        Err(why) => {
-            error!("Input Error: {} in {}", why, input_name);
-            std::process::exit(1);
-        }
-    };
-
-    info!("start read {:?} file: {}", in_format, input_name);
-
-    match in_format {
-        FileFormat::Maf => {
-            let mut mafreader = MAFReader::new(reader);
-            info!(
-                "start convert {:?} file into {:?}: {}",
-                in_format, out_format, output_name
-            );
-            mafreader.convert(output, out_format);
-        }
-        FileFormat::Paf => {
-            let mut pafreader = PAFReader::new(reader);
-            pafreader.convert(output, out_format, *target_fa_path, *query_fa_path);
-        }
-        FileFormat::Chain => {
-            let mut chainreader = ChainReader::new(reader);
-            chainreader.convert(output, out_format, *target_fa_path, *query_fa_path);
-        }
-        _ => {
-            error!("Error: unsupported input format");
-            std::process::exit(1);
-        }
-    }
+    Ok(())
 }
 
 /// Command: maf2paf
-pub fn maf2paf(input: &Option<String>, output: &String, rewrite: bool) {
-    convert(
-        FileFormat::Maf,
-        FileFormat::Paf,
-        input,
-        output,
-        &None,
-        &None,
-        rewrite,
-    );
+pub fn wrap_maf2paf(input: &Option<String>, output: &str, rewrite: bool) -> Result<(), WGAError> {
+    // prepare reader and writer
+    let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
+    let mut mafrdr = MAFReader::new(reader)?;
+    maf2paf(&mut mafrdr, &mut writer)?;
+    Ok(())
 }
 
 /// Command: maf2chain
-pub fn maf2chain(input: &Option<String>, output: &String, rewrite: bool) {
-    convert(
-        FileFormat::Maf,
-        FileFormat::Chain,
-        input,
-        output,
-        &None,
-        &None,
-        rewrite,
-    );
-}
-
-/// Command: paf2chain
-pub fn paf2chain(input: &Option<String>, output: &String, rewrite: bool) {
-    convert(
-        FileFormat::Paf,
-        FileFormat::Chain,
-        input,
-        output,
-        &None,
-        &None,
-        rewrite,
-    );
-}
-
-/// Command: paf2maf
-pub fn paf2maf(
-    input: &Option<String>,
-    output: &String,
-    target_fa_path: &str,
-    query_fa_path: &str,
-    rewrite: bool,
-) {
-    let target_fa_path = Some(target_fa_path);
-    let query_fa_path = Some(query_fa_path);
-    convert(
-        FileFormat::Paf,
-        FileFormat::Maf,
-        input,
-        output,
-        &target_fa_path,
-        &query_fa_path,
-        rewrite,
-    );
-}
-
-/// Command: chain2maf
-pub fn chain2maf(
-    input: &Option<String>,
-    output: &String,
-    target_fa_path: &str,
-    query_fa_path: &str,
-    rewrite: bool,
-) {
-    let target_fa_path = Some(target_fa_path);
-    let query_fa_path = Some(query_fa_path);
-    convert(
-        FileFormat::Chain,
-        FileFormat::Maf,
-        input,
-        output,
-        &target_fa_path,
-        &query_fa_path,
-        rewrite,
-    );
-}
-
-/// Command: chain2paf
-pub fn chain2paf(input: &Option<String>, output: &String, rewrite: bool) {
-    convert(
-        FileFormat::Chain,
-        FileFormat::Paf,
-        input,
-        output,
-        &None,
-        &None,
-        rewrite,
-    );
+pub fn wrap_maf2chain(input: &Option<String>, output: &str, rewrite: bool) -> Result<(), WGAError> {
+    // prepare reader and writer
+    let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
+    let mut mafrdr = MAFReader::new(reader)?;
+    maf2chain(&mut mafrdr, &mut writer)?;
+    Ok(())
 }
 
 /// Command: maf2sam
-pub fn maf2sam(input: &Option<String>, output: &String, rewrite: bool) {
-    convert(
-        FileFormat::Maf,
-        FileFormat::Sam,
-        input,
-        output,
-        &None,
-        &None,
-        rewrite,
-    );
+pub fn wrap_maf2sam(input: &Option<String>, output: &str, rewrite: bool) -> Result<(), WGAError> {
+    // prepare reader and writer
+    let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
+    let mut mafrdr = MAFReader::new(reader)?;
+    maf2sam(&mut mafrdr, &mut writer)?;
+    Ok(())
+}
+
+/// Command: paf2chain
+pub fn wrap_paf2chain(input: &Option<String>, output: &str, rewrite: bool) -> Result<(), WGAError> {
+    // prepare reader and writer
+    let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
+    let mut pafrdr = PAFReader::new(reader);
+    paf2chain(&mut pafrdr, &mut writer)?;
+    Ok(())
+}
+
+/// Command: paf2maf
+pub fn wrap_paf2maf(
+    input: &Option<String>,
+    output: &str,
+    target_fa_path: &str,
+    query_fa_path: &str,
+    rewrite: bool,
+) -> Result<(), WGAError> {
+    // prepare reader and writer
+    let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
+    let mut pafrdr = PAFReader::new(reader);
+    paf2maf(&mut pafrdr, &mut writer, target_fa_path, query_fa_path)?;
+    Ok(())
+}
+
+/// Command: chain2maf
+pub fn wrap_chain2maf(
+    input: &Option<String>,
+    output: &str,
+    target_fa_path: &str,
+    query_fa_path: &str,
+    rewrite: bool,
+) -> Result<(), WGAError> {
+    // prepare reader and writer
+    let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
+    let mut chainrdr = ChainReader::new(reader);
+    chain2maf(&mut chainrdr, &mut writer, target_fa_path, query_fa_path)?;
+    Ok(())
+}
+
+/// Command: chain2paf
+pub fn wrap_chain2paf(input: &Option<String>, output: &str, rewrite: bool) -> Result<(), WGAError> {
+    // prepare reader and writer
+    let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
+    let mut chainrdr = ChainReader::new(reader);
+    chain2paf(&mut chainrdr, &mut writer)?;
+    Ok(())
 }
 
 /// Command: build maf index
-pub fn wrap_build_index(input: &String, outputpath: &str) {
+pub fn wrap_build_index(input: &String, outputpath: &str) -> Result<(), WGAError> {
     let outputpath = match outputpath {
         "-" => {
             // add .idx suffix to input file
@@ -262,21 +216,11 @@ pub fn wrap_build_index(input: &String, outputpath: &str) {
         path => path.to_owned(),
     };
 
-    let mut mafreader = MAFReader::from_path(input).unwrap();
-    // // init index-writer and csv-writer for deserializing
-    // let mut idx_wtr = csv::WriterBuilder::new()
-    //     .delimiter(b'\t')
-    //     .has_headers(false)
-    //     .from_writer(output_writer(&outputpath));
-    // init index-writer
-    let idx_wtr = output_writer(&outputpath);
-    match build_index(&mut mafreader, idx_wtr) {
-        Ok(_) => {}
-        Err(err) => {
-            error!("{}", err);
-            std::process::exit(1);
-        }
-    }
+    let mut mafreader = MAFReader::from_path(input)?;
+
+    // NOTE: new index file will always overwrite old one
+    let idx_wtr = get_output_writer(&outputpath, true)?;
+    build_index(&mut mafreader, idx_wtr)
 }
 
 /// Command: maf extract
@@ -284,101 +228,78 @@ pub fn wrap_maf_extract(
     input: &Option<String>,
     regions: &Option<Vec<String>>,
     region_file: &Option<String>,
-    output: &String,
+    output: &str,
     rewrite: bool,
-) {
+) -> Result<(), WGAError> {
     // judge regions and region_file
     if regions.is_none() && region_file.is_none() {
-        error!("regions or region_file must be specified");
-        std::process::exit(1);
+        return Err(WGAError::EmptyRegion);
     }
 
-    outfile_exist(output, rewrite);
-
-    let _input_name = match input {
-        Some(path) => path,
-        None => "stdin",
-    };
-
-    let _output_name = match output.as_str() {
+    // init writer and check if output file exists
+    let output_name = match output {
         "-" => "stdout",
         path => path,
     };
-
-    let mut writer = output_writer(output);
+    info!("start write file: `{}`", output_name);
+    let mut writer = get_output_writer(output, rewrite)?;
 
     match input {
         // if input if from file, use index
         Some(path) => {
-            let mut mafreader = MAFReader::from_path(path).unwrap();
+            if path == "-" {
+                return Err(WGAError::StdinNotAllowed);
+            }
+            let mut mafreader = MAFReader::from_path(path)?;
             let index_path = format!("{}.index", path);
-            let index_rdr = match File::open(index_path) {
-                Ok(file) => BufReader::new(file),
-                Err(err) => {
-                    warn!(
-                        "failed to open index file: {}, please use `maf-index` to create it; will use iterator to extract",
-                        err
-                    );
-                    // std::process::exit(1);
-                    todo!("use iterator to extract")
-                }
-            };
-            let mafindex: MafIndex = serde_json::from_reader(index_rdr).unwrap();
-            maf_extract_idx(regions, region_file, &mut mafreader, mafindex, &mut writer);
+            let index_rdr = BufReader::new(File::open(index_path)?);
+            let mafindex: MafIndex = serde_json::from_reader(index_rdr)?;
+            let failed_regions =
+                maf_extract_idx(regions, region_file, &mut mafreader, mafindex, &mut writer)?;
+            for region in failed_regions {
+                let err = WGAError::FailedRegion(region);
+                warn!("{}", err);
+            }
+            Ok(())
         }
-        None => {
-            todo!("use iterator to extract")
-        }
+        // if input is from stdin, raise error
+        None => Err(WGAError::StdinNotAllowed),
     }
 }
 
 /// Command: maf call
 pub fn wrap_maf_call(
-    input: &String,
-    output: &String,
+    input: &Option<String>,
+    output: &str,
     rewrite: bool,
     snp: bool,
     svlen: u64,
     between: bool,
     sample: Option<&str>,
-) {
-    outfile_exist(output, rewrite);
+) -> Result<(), WGAError> {
+    // prepare reader and writer
+    let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
 
-    let _output_name = match output.as_str() {
-        "-" => "stdout",
-        path => path,
-    };
-
-    let mut writer = output_writer(output);
-
-    let mut mafreader = MAFReader::from_path(input).unwrap();
-    let index_path = format!("{}.index", input);
-
-    let mafindex = match File::open(index_path) {
-        Ok(file) => {
-            let index_rdr = BufReader::new(file);
-            match serde_json::from_reader(index_rdr) {
-                Ok(mafindex) => Some(mafindex),
-                Err(err) => {
-                    warn!(
-                        "failed to deserialize index file: {},
-                        please check!",
-                        err
-                    );
-                    None
-                }
+    // get mafindex if input is not stdin
+    let mafindex = match input {
+        Some(path) => {
+            if path == "-" {
+                None
+            } else {
+                let index_path = format!("{}.index", path);
+                let index_rdr = BufReader::new(File::open(index_path)?);
+                let mafindex: MafIndex = serde_json::from_reader(index_rdr)?;
+                Some(mafindex)
             }
         }
-        Err(err) => {
-            warn!(
-                "failed to open index file: {},
-                please use `maf-index` to create it;
-                will not generate contig info",
-                err
-            );
-            None
-        }
+        None => None,
     };
+    if mafindex.is_none() {
+        warn!("maf index not found, will not generate contig info");
+    }
+
+    // get mafreader
+    let mut mafreader = MAFReader::new(reader)?;
 
     call_var_maf(
         &mut mafreader,
@@ -388,111 +309,61 @@ pub fn wrap_maf_call(
         svlen,
         between,
         sample,
-    );
+    )?;
+    Ok(())
 }
 
+/// A wrapper for stat sub-cmd, match format and call `stat_{maf,paf}`
 pub fn wrap_stat(
     format: FileFormat,
     input: &Option<String>,
-    output: &String,
+    output: &str,
     rewrite: bool,
     each: bool,
-) {
-    outfile_exist(output, rewrite);
-    let input_name = match input {
-        Some(path) => path,
-        None => "stdin",
-    };
+) -> Result<(), WGAError> {
+    // prepare reader and writer
+    let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
 
-    let _output_name = match output.as_str() {
-        "-" => "stdout",
-        path => path,
-    };
-
-    let reader = match get_input_reader(input) {
-        Ok(reader) => reader,
-        Err(why) => {
-            error!("Input Error: {} in {}", why, input_name);
-            std::process::exit(1);
-        }
-    };
-
-    info!("start read {:?} file: {}", format, input_name);
-
-    let mut writer = output_writer(output);
-
+    // match format and call stat
     match format {
         FileFormat::Maf => {
-            let mafrdr = MAFReader::new(reader);
-            match stat_maf(mafrdr, &mut writer, each) {
-                Ok(_) => {}
-                Err(err) => {
-                    error!("{}", err);
-                    std::process::exit(1);
-                }
-            }
+            let mafrdr = MAFReader::new(reader)?;
+            stat_maf(mafrdr, &mut writer, each)?
         }
         FileFormat::Paf => {
-            let pafrdr = PAFReader::new(reader);
-            match stat_paf(pafrdr, &mut writer, each) {
-                Ok(_) => {}
-                Err(err) => {
-                    error!("{}", err);
-                    std::process::exit(1);
-                }
-            }
+            let _pafrdr = PAFReader::new(reader);
         }
         _ => {}
     }
+    Ok(())
 }
 
+/// A wrapper for filter sub-cmd, match format and call `filter_{maf,paf}`
 pub fn wrap_filter(
     format: FileFormat,
     input: &Option<String>,
-    output: &String,
+    output: &str,
     rewrite: bool,
     min_block_size: u64,
     min_query_size: u64,
-) {
-    outfile_exist(output, rewrite);
-    let input_name = match input {
-        Some(path) => path,
-        None => "stdin",
-    };
-
-    let reader = match get_input_reader(input) {
-        Ok(reader) => reader,
-        Err(why) => {
-            error!("Input Error: {} in {}", why, input_name);
-            std::process::exit(1);
-        }
-    };
-
-    info!("start read {:?} file: {}", format, input_name);
-
-    let mut writer = output_writer(output);
+) -> Result<(), WGAError> {
+    // prepare reader and writer
+    let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
 
     match format {
         FileFormat::Maf => {
-            let mafrdr = MAFReader::new(reader);
-            match filter_maf(mafrdr, &mut writer, min_block_size, min_query_size) {
-                Ok(_) => {}
-                Err(err) => {
-                    error!("{}", err);
-                    std::process::exit(1);
-                }
-            }
+            let mafrdr = MAFReader::new(reader)?;
+            filter_maf(mafrdr, &mut writer, min_block_size, min_query_size)?
         }
         FileFormat::Paf => {
             let pafrdr = PAFReader::new(reader);
-            match filter_paf(pafrdr, &mut writer, min_block_size, min_query_size) {
-                Ok(_) => {}
-                Err(err) => {
-                    error!("{}", err);
-                    std::process::exit(1);
-                }
-            }
+            filter_paf(pafrdr, &mut writer, min_block_size, min_query_size)?
+        }
+        FileFormat::Chain => {
+            let chainrdr = ChainReader::new(reader);
+            filter_chain(chainrdr, &mut writer, min_block_size, min_query_size)?
         }
         _ => {}
     }
+    Ok(())
 }
