@@ -354,9 +354,10 @@ fn cigar_unit_chain(
             // will not write unless: [1. size == 0; 2. both no query&target diff]
             if (dataline.size != 0) && (dataline.target_diff + dataline.query_diff != 0) {
                 wtr.write_all(format!("{}", dataline).as_bytes())?;
+                dataline.size = 0;
             };
             // accumulate size
-            dataline.size = count;
+            dataline.size += count;
             // init query&target diff
             dataline.target_diff = 0;
             dataline.query_diff = 0;
