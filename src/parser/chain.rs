@@ -1,8 +1,6 @@
-use crate::converter::chain2maf::chain2maf;
-use crate::converter::chain2paf::chain2paf;
 use crate::errors::{ParseChainErrKind, WGAError};
 use crate::parser::cigar::parse_chain_to_cigar;
-use crate::parser::common::{AlignRecord, FileFormat, SeqInfo, Strand};
+use crate::parser::common::{AlignRecord, SeqInfo, Strand};
 use crate::parser::maf::MAFRecord;
 use crate::parser::paf::PafRecord;
 use crate::utils::{parse_str2f64, parse_str2u64};
@@ -32,29 +30,10 @@ where
     }
 
     /// Iterate over the records in the Chain file
-    pub fn records(&mut self) -> ChainRecords {
+    pub fn records(&mut self) -> Result<ChainRecords, WGAError> {
         let mut data = String::with_capacity(512);
-        self.inner.read_to_string(&mut data).unwrap();
-        ChainRecords { inner: data }
-    }
-
-    /// convert method
-    pub fn convert(
-        &mut self,
-        outputpath: &str,
-        format: FileFormat,
-        t_fa_path: Option<&str>,
-        q_fa_path: Option<&str>,
-    ) {
-        match format {
-            FileFormat::Paf => {
-                chain2paf(self, outputpath);
-            }
-            FileFormat::Maf => {
-                chain2maf(self, outputpath, t_fa_path, q_fa_path);
-            }
-            _ => {}
-        }
+        self.inner.read_to_string(&mut data)?;
+        Ok(ChainRecords { inner: data })
     }
 }
 
@@ -69,7 +48,7 @@ impl ChainReader<File> {
 /// refer into https://genome.ucsc.edu/goldenPath/help/chain.html
 #[derive(Debug)]
 pub struct ChainRecord {
-    pub header: Header,
+    pub header: ChainHeader,
     pub lines: Vec<ChainDataLine>,
 }
 
@@ -95,7 +74,7 @@ impl Iterator for ChainRecords {
 
 /// Define a chain header
 #[derive(Debug, Default)]
-pub struct Header {
+pub struct ChainHeader {
     score: f64, // could be u64?
     target: SeqInfo,
     query: SeqInfo,
@@ -120,9 +99,9 @@ impl fmt::Display for ChainDataLine {
     }
 }
 
-impl From<&PafRecord> for Header {
+impl From<&PafRecord> for ChainHeader {
     fn from(value: &PafRecord) -> Self {
-        Header {
+        ChainHeader {
             score: value.mapq as f64,
             target: SeqInfo {
                 name: value.target_name.clone(),
@@ -143,9 +122,9 @@ impl From<&PafRecord> for Header {
     }
 }
 
-impl From<&MAFRecord> for Header {
+impl From<&MAFRecord> for ChainHeader {
     fn from(value: &MAFRecord) -> Self {
-        Header {
+        ChainHeader {
             score: 255.0,
             target: SeqInfo {
                 name: value.target_name().to_owned(),
@@ -166,7 +145,7 @@ impl From<&MAFRecord> for Header {
     }
 }
 
-impl fmt::Display for Header {
+impl fmt::Display for ChainHeader {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -187,7 +166,7 @@ impl fmt::Display for Header {
     }
 }
 
-fn parse_header(input: &str) -> Result<Header, WGAError> {
+fn parse_header(input: &str) -> Result<ChainHeader, WGAError> {
     let mut iter = input.split_whitespace();
     let score = match iter.next() {
         Some(score) => parse_str2f64(score)?,
@@ -285,7 +264,7 @@ fn parse_header(input: &str) -> Result<Header, WGAError> {
             )))
         }
     };
-    Ok(Header {
+    Ok(ChainHeader {
         score,
         target: SeqInfo {
             name: target_name.to_owned(),
@@ -411,14 +390,14 @@ impl AlignRecord for ChainRecord {
         self.header.target.end - self.header.target.start
     }
 
-    fn convert2paf(&self) -> PafRecord {
+    fn convert2paf(&self) -> Result<PafRecord, WGAError> {
         let cigar = parse_chain_to_cigar(self, false);
         let cigar_string = cigar.cigar_string;
         let block_length =
             (cigar.match_count + cigar.mismatch_count + cigar.del_count + cigar.inv_del_count)
                 as u64;
         let matches = cigar.match_count as u64;
-        PafRecord {
+        Ok(PafRecord {
             query_name: self.query_name().to_string(),
             query_length: self.query_length(),
             query_start: self.query_start(),
@@ -432,6 +411,6 @@ impl AlignRecord for ChainRecord {
             block_length,
             mapq: 255,
             tags: vec![cigar_string],
-        }
+        })
     }
 }
