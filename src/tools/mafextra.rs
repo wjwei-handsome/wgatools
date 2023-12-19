@@ -9,6 +9,7 @@ use super::index::{IvP, MafIndex};
 
 use crate::errors::{ParseGenomeRegionErrKind, WGAError};
 use crate::parser::maf::{MAFReader, MAFWriter};
+use crate::utils::parse_str2u64;
 use csv::ReaderBuilder;
 use std::io::Read;
 use std::io::Seek;
@@ -80,12 +81,24 @@ pub struct GenomeRegion {
 impl TryFrom<String> for GenomeRegion {
     type Error = WGAError;
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        let re = Regex::new(r"^([a-zA-Z0-9.@_-]+):([0-9]+)-([0-9]+)$").unwrap();
+        let re = Regex::new(r"^([a-zA-Z0-9.@_-]+):([0-9]+)-([0-9]+)$")?;
         match re.captures(&value) {
             Some(caps) => {
-                let name = caps.get(1).unwrap().as_str().to_string();
-                let start = caps.get(2).unwrap().as_str().parse::<u64>().unwrap();
-                let end = caps.get(3).unwrap().as_str().parse::<u64>().unwrap();
+                let name = caps
+                    .get(1)
+                    .ok_or(WGAError::UnexceptedRegexError("name".to_string()))?
+                    .as_str()
+                    .to_string();
+                let start = caps
+                    .get(2)
+                    .ok_or(WGAError::UnexceptedRegexError("start".to_string()))?
+                    .as_str();
+                let start = parse_str2u64(start)?;
+                let end = caps
+                    .get(3)
+                    .ok_or(WGAError::UnexceptedRegexError("end".to_string()))?
+                    .as_str();
+                let end = parse_str2u64(end)?;
                 if start > end {
                     return Err(WGAError::ParseGenomeRegion(
                         ParseGenomeRegionErrKind::StartGTEnd(start, end),
@@ -159,11 +172,9 @@ fn extract_sub_blocks_with_idx<R: Read + Send + Seek, W: Write>(
                     _ => {
                         for block in find {
                             let offset = block.val;
-                            mafreader
-                                .inner
-                                .seek(std::io::SeekFrom::Start(offset))
-                                .unwrap();
-                            let mut mafrec = mafreader.records().next().unwrap().unwrap();
+                            mafreader.inner.seek(std::io::SeekFrom::Start(offset))?;
+                            let mut mafrec =
+                                mafreader.records().next().ok_or(WGAError::EmptyRecord)??;
 
                             let b_start = block.start;
                             let b_end = block.stop;
