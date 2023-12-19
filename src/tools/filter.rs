@@ -12,17 +12,23 @@ use std::io::{Read, Write};
 // filter chain
 pub fn filter_chain<R: Read + Send>(
     mut reader: ChainReader<R>,
-    _writer: &mut dyn Write,
+    writer: &mut dyn Write,
     min_block_size: u64,
     min_query_size: u64,
 ) -> Result<(), WGAError> {
     for rec in reader.records()? {
-        println!("www");
         let rec = rec?;
         let rec = filter_alignrec(&rec, min_block_size, min_query_size)?;
         // just write the record
         if let Some(rec) = rec {
-            println!("{:?}", rec)
+            let chainheader = &rec.header;
+            let chainblocks = &rec.lines;
+            writer.write_all(format!("{}", chainheader).as_bytes())?;
+            for dataline in chainblocks {
+                writer.write_all(format!("{}", dataline).as_bytes())?;
+            }
+            // additional newline for standard chain format
+            writer.write_all(b"\n\n")?;
         }
     }
     Ok(())
