@@ -7,19 +7,20 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum WGAError {
     // IO error
-    #[error("IO Error:{0}")]
+    #[error("IO error:{0}")]
     Io(#[from] std::io::Error),
+    // File path not exist
+    #[error("File path `{0}` not exist")]
+    FileNotExist(std::path::PathBuf),
     // Parse MAF Error
-    #[error("Parse MAF Error By: {0}")]
+    #[error("Parse MAF error by: {0}")]
     ParseMaf(ParseMafErrKind),
-    #[error("csv dese error")]
+    #[error("CSV deserialize error by: {0}")]
     CsvDeserialize(#[from] csv::Error),
     #[error("Empty stdin, please add `-h` for help")]
     EmptyStdin,
     #[error("File `{0}` already exists, please add `-r` to rewrite it.")]
     FileReWrite(String),
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
     #[error("json dese error")]
     SerdeDeserialize(#[from] serde_json::Error),
     #[error("ThreadPoolBuildError error")]
@@ -32,11 +33,11 @@ pub enum WGAError {
     StdinNotAllowed,
     #[error("Parse Genome Region Error By: {0}")]
     ParseGenomeRegion(ParseGenomeRegionErrKind),
-    #[error("failed region: {0}")]
+    #[error("Failed region: {0}")]
     FailedRegion(GenomeRegion),
     #[error("Duplicate name `{0}` in a record not allowed, please check or use `modname`")]
     DuplicateName(String),
-    #[error("Format {0} Parse Error, please check")]
+    #[error("Format {0} Parse Error by rust::nom, please check")]
     NomErr(#[from] nom::error::Error<String>),
     #[error("Parse Chain Error By: {0}")]
     ParseChain(ParseChainErrKind),
@@ -48,6 +49,25 @@ pub enum WGAError {
     #[error("Parse `{0}` Into Float Error")]
     #[from = "ParseFloatError"]
     ParseFloatError(String),
+    #[error("CIGAR start tag not found")]
+    CigarTagNotFound,
+    #[error("CIGAR OP `{0}` invalid")]
+    CigarOpInvalid(String),
+    #[error("noodles-sam parse error {0}")]
+    NoodlesSamParseError(#[from] noodles::sam::record::reference_sequence_name::ParseError),
+    #[error("noodlesp-sam try into num parse error {0}")]
+    TryIntoNum(#[from] std::num::TryFromIntError),
+    #[error("noodlesp-sam read name parse error {0}")]
+    ReadNameParseError(#[from] noodles::sam::record::read_name::ParseError),
+    #[error("HTS library error by {0}")]
+    HtsLibError(#[from] rust_htslib::errors::Error),
+    #[error("Unexcepted Regex Error by: {0}")]
+    UnexceptedRegexError(String),
+    #[error("Regex build Error")]
+    RegexBuildError(#[from] regex::Error),
+    // Other error
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
 }
 
 impl From<nom::Err<nom::error::Error<&str>>> for WGAError {
@@ -68,18 +88,12 @@ pub enum ParseMafErrKind {
     FiledMissing(String),
     #[error("Surplus Filed > 7")]
     SurplusField,
-    // #[error("Parse `{0}` Into Integer Error")]
-    // #[from = "ParseIntError"]
-    // ParseIntError(String),
 }
 
 #[derive(Error, Debug)]
 pub enum ParseChainErrKind {
     #[error("Chain Line Field `{0}` Missing")]
     FiledMissing(String),
-    // #[error("Parse `{0}` Into Integer Error")]
-    // #[from = "ParseIntError"]
-    // ParseIntError(String),
 }
 
 #[derive(Error, Debug)]
