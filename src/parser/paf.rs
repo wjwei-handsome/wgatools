@@ -1,8 +1,5 @@
-use crate::converter::paf2block::paf2blocks;
-use crate::converter::paf2chain::paf2chain;
-use crate::converter::paf2maf::paf2maf;
 use crate::errors::WGAError;
-use crate::parser::common::{AlignRecord, FileFormat, Strand};
+use crate::parser::common::{AlignRecord, Strand};
 use csv::{DeserializeRecordsIter, ReaderBuilder};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
@@ -33,22 +30,6 @@ where
     pub fn records(&mut self) -> Records<'_, R> {
         Records {
             inner: self.inner.deserialize(),
-        }
-    }
-
-    /// convert method
-    pub fn convert(
-        &mut self,
-        outputpath: &str,
-        format: FileFormat,
-        t_fa_path: Option<&str>,
-        q_fa_path: Option<&str>,
-    ) {
-        match format {
-            FileFormat::Chain => paf2chain(self, outputpath),
-            FileFormat::Blocks => paf2blocks(self, outputpath),
-            FileFormat::Maf => paf2maf(self, outputpath, t_fa_path, q_fa_path),
-            _ => {}
         }
     }
 }
