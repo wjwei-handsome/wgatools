@@ -67,7 +67,7 @@ pub enum WGAError {
     RegexBuildError(#[from] regex::Error),
     #[error("Invalid Base: `{0}`")]
     InvalidBase(String),
-    #[error("NOT IMPLEMENTED,:(")]
+    #[error("Ah-oh! NOT IMPLEMENTED :(")]
     NotImplemented,
     // Other error
     #[error(transparent)]
