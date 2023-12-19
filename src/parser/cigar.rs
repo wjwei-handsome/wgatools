@@ -1,14 +1,31 @@
 use crate::errors::WGAError;
 use crate::parser::chain::{ChainDataLine, ChainRecord};
 use crate::parser::common::{AlignRecord, Block};
+use crate::utils::parse_str2u64;
 use csv::Writer;
 use itertools::Itertools;
 use nom::bytes::complete::{tag, take_till, take_while};
 use nom::error::Error;
-use nom::multi::fold_many0;
+use nom::multi::fold_many1;
 use nom::{AsChar, IResult};
 use std::io::Write;
 use std::str;
+
+// define Cigar struct
+pub struct Cigar {
+    pub cigar_string: String,
+    pub match_count: usize,
+    pub mismatch_count: usize,
+    pub ins_event: usize,
+    pub ins_count: usize,
+    pub del_event: usize,
+    pub del_count: usize,
+    pub inv_ins_event: usize,
+    pub inv_ins_count: usize,
+    pub inv_del_event: usize,
+    pub inv_del_count: usize,
+    pub inv_event: usize,
+}
 
 /// CigarUnit is a atom operation in cigar string
 #[derive(Debug)]
@@ -17,8 +34,28 @@ struct CigarUnit {
     len: u64, // length of the operation
 }
 
+struct CigarStrTuple<'a>(&'a str, &'a str);
+/// Convert CigarStrTuple to CigarUnit
+/// NOTE: We have carried out seemingly cumbersome operations here,
+/// in fact, in order to better transmit errors due to
+/// nom::fold_many1, we need to return IResult for FnMut
+fn cst2cu(cst: CigarStrTuple) -> Result<CigarUnit, WGAError> {
+    // just consume the first char of cst.0, will faster than cst.0.as_bytes()[0]
+    let mut chars = cst.0.chars();
+    let op = match chars.next() {
+        Some(c) => c,
+        None => return Err(WGAError::CigarOpInvalid(cst.0.to_string())),
+    };
+    // read cst.0 next again to check if it is a valid op
+    if chars.next().is_some() {
+        return Err(WGAError::CigarOpInvalid(cst.0.to_string()));
+    }
+    let len = parse_str2u64(cst.1)?; // actually it will never occur error
+    Ok(CigarUnit { op, len })
+}
+
 /// Parse a cigar unit until the input is empty
-fn parse_cigar_unit(input: &str) -> IResult<&str, CigarUnit> {
+fn parse_cigar_str_tuple(input: &str) -> IResult<&str, CigarStrTuple> {
     // if input is empty, return error to break infinite loop
     if input.is_empty() {
         return Err(nom::Err::Error(Error::new(
@@ -33,16 +70,7 @@ fn parse_cigar_unit(input: &str) -> IResult<&str, CigarUnit> {
     // take alphabetic
     let (input, op) = take_till(AsChar::is_dec_digit)(input)?;
 
-    // convert len to u64
-    // TODO: handle parse error
-    let len = len.parse::<u64>().unwrap();
-
-    let cigar_unit = CigarUnit {
-        // TODO: op.len() always === 1, if need a parse err? or pass to match op {}?
-        op: char::from(op.as_bytes()[0]),
-        len,
-    };
-    Ok((input, cigar_unit))
+    Ok((input, CigarStrTuple(op, len)))
 }
 
 /// a phantom
@@ -53,7 +81,7 @@ fn null() -> Result<(), WGAError> {
 fn cigar_unit_block(
     op: char,
     count: u64,
-    wtr: &mut Writer<Box<dyn Write>>,
+    wtr: &mut Writer<&mut dyn Write>,
     block: &mut Block,
 ) -> Result<(), WGAError> {
     match op {
@@ -88,10 +116,10 @@ fn cigar_unit_block(
 /// write into a blocks file
 /// - For PafRecord: cigar should only contains 'M,I,D'
 /// - For SamRecord: cigar's first `[0-9]+H` should represent the query start
-pub fn parse_cigar_to_blocks<'a, T: AlignRecord>(
-    rec: &'a T,
-    wtr: &mut Writer<Box<dyn Write>>,
-) -> Result<(&'a str, Result<(), WGAError>), WGAError> {
+pub fn parse_cigar_to_blocks<T: AlignRecord>(
+    rec: &T,
+    wtr: &mut Writer<&mut dyn Write>,
+) -> Result<(), WGAError> {
     // get cigar bytes and tags
     let cigar = rec.get_cigar_str()?;
     let (cigar, _tag) = tag("cg:Z:")(cigar)?;
@@ -108,20 +136,29 @@ pub fn parse_cigar_to_blocks<'a, T: AlignRecord>(
     };
 
     // fold cigar bytes into many CigarUnits[#CigarUnit]
-    let (rest, res) = fold_many0(parse_cigar_unit, null, |_, cigarunit| {
-        cigar_unit_block(cigarunit.op, cigarunit.len, wtr, &mut block)
-    })(cigar)?;
-    Ok((rest, res))
+    let (_, res) = fold_many1(
+        parse_cigar_str_tuple,
+        null,
+        |res: Result<(), WGAError>, cigarunit| {
+            if res.is_ok() {
+                let cigarunit = cst2cu(cigarunit)?;
+                cigar_unit_block(cigarunit.op, cigarunit.len, wtr, &mut block)?
+            }
+            res
+        },
+    )(cigar)?;
+    res
 }
 
 /// Parse cigar string of a AlignRecord[PafRecord, SamRecord] which includes cg:Z: tag and
 /// write into a chain file.
 /// - For PafRecord: cigar should only contains 'M,I,D'
 /// - For SamRecord: cigar's first `[0-9]+H` should represent the query start
-pub fn parse_cigar_to_chain<'a, T: AlignRecord>(
-    rec: &'a T,
+pub fn parse_cigar_to_chain<T: AlignRecord>(
+    rec: &T,
     wtr: &mut Box<dyn Write>,
-) -> Result<(&'a str, Result<(), WGAError>), WGAError> {
+    // ) -> Result<(&'a str, Result<(), WGAError>), WGAError> {
+) -> Result<(), WGAError> {
     // get cigar bytes and tag
     let cigar = rec.get_cigar_str()?;
     let (cigar, _tag) = tag("cg:Z:")(cigar)?;
@@ -134,16 +171,33 @@ pub fn parse_cigar_to_chain<'a, T: AlignRecord>(
     };
 
     // try regex for cigar
+    // let re = regex::Regex::new(r"([0-9]+)([MID=X])")?;
+    // for cap in re.captures_iter(cigar) {
+    //     let len = cap[1].parse::<u64>()?;
+    //     let op = cap[2].chars().next()?;
+    //     cigar_unit_chain(op, len, wtr, &mut dataline)?;
+    // }
+    // Unfortunately, it turns out that this is three times slower than nom
 
     // fold cigar bytes into many CigarUnits[#CigarUnit]
-    let (rest, res) = fold_many0(parse_cigar_unit, null, |_, cigarunit| {
-        // get operate counts
-        cigar_unit_chain(cigarunit.op, cigarunit.len, wtr, &mut dataline)
-    })(cigar)?;
+    let (_, res) = fold_many1(
+        parse_cigar_str_tuple,
+        null,
+        |res: Result<(), WGAError>, cigarunit| {
+            // Continue execution only when no error occurs
+            if res.is_ok() {
+                let cigarunit = cst2cu(cigarunit)?;
+                cigar_unit_chain(cigarunit.op, cigarunit.len, wtr, &mut dataline)?;
+            }
+            res
+        },
+    )(cigar)?;
 
-    // After all cigar units write done, the last dataline.size should be wrote
-    wtr.write_all(format!("\n{}", dataline.size).as_bytes())?;
-    Ok((rest, res))
+    // After all cigar units successfully write done, the last dataline.size should be wrote
+    if res.is_ok() {
+        wtr.write_all(format!("\n{}", dataline.size).as_bytes())?;
+    }
+    res
 }
 
 /// cigar category method -- extension
@@ -170,21 +224,6 @@ pub fn cigar_cat(c1: &char, c2: &char) -> char {
     } else {
         'M'
     }
-}
-
-pub struct Cigar {
-    pub cigar_string: String,
-    pub match_count: usize,
-    pub mismatch_count: usize,
-    pub ins_event: usize,
-    pub ins_count: usize,
-    pub del_event: usize,
-    pub del_count: usize,
-    pub inv_ins_event: usize,
-    pub inv_ins_count: usize,
-    pub inv_del_event: usize,
-    pub inv_del_count: usize,
-    pub inv_event: usize,
 }
 
 /// parse MAF two seqs into Cigar
@@ -342,7 +381,6 @@ fn cigar_unit_insert_seq(
     t_seq: &mut String,
     q_seq: &mut String,
 ) -> Result<(), WGAError> {
-    println!("current pos:{}", current_offset);
     match op {
         'M' | '=' | 'X' => {
             // do nothing but move offset
@@ -366,27 +404,35 @@ fn cigar_unit_insert_seq(
 }
 
 /// Parse cigar to insert `-` in MAF sequences
-pub fn parse_cigar_to_insert<'a, T: AlignRecord>(
-    rec: &'a T,
+pub fn parse_cigar_to_insert<T: AlignRecord>(
+    rec: &T,
     t_seq: &mut String,
     q_seq: &mut String,
-) -> Result<(&'a str, Result<(), WGAError>), WGAError> {
+) -> Result<(), WGAError> {
     // get cigar bytes and tag
     let cigar = rec.get_cigar_str()?;
     let (cigar, _tag) = tag("cg:Z:")(cigar)?;
 
     // fold cigar bytes into many CigarUnits[#CigarUnit]
     let mut current_offset = 0;
-    let (rest, res) = fold_many0(parse_cigar_unit, null, |_, cigarunit| {
-        cigar_unit_insert_seq(
-            cigarunit.op,
-            cigarunit.len,
-            &mut current_offset,
-            t_seq,
-            q_seq,
-        )
-    })(cigar)?;
-    Ok((rest, res))
+    let (_, res) = fold_many1(
+        parse_cigar_str_tuple,
+        null,
+        |res: Result<(), WGAError>, cigarunit| {
+            if res.is_ok() {
+                let cigarunit = cst2cu(cigarunit)?;
+                cigar_unit_insert_seq(
+                    cigarunit.op,
+                    cigarunit.len,
+                    &mut current_offset,
+                    t_seq,
+                    q_seq,
+                )?
+            }
+            res
+        },
+    )(cigar)?;
+    res
 }
 
 /// parse ChainRecord into Cigar
