@@ -107,7 +107,7 @@ fn cigar_unit_block(
             block.target_end += count;
             block.target_start += count;
         }
-        _ => {} // TODO: handle `H` for SAM
+        _ => return Err(WGAError::CigarOpInvalid(op.to_string())), // TODO: handle `H` for SAM
     };
     Ok(())
 }
@@ -370,7 +370,7 @@ fn cigar_unit_chain(
             // accumulate query diff for 'D'
             dataline.query_diff += count;
         }
-        _ => {} // TODO: handle 'H' for SAM
+        _ => return Err(WGAError::CigarOpInvalid(op.to_string())), // TODO: handle 'H' for SAM
     };
     Ok(())
 }
@@ -399,7 +399,7 @@ fn cigar_unit_insert_seq(
             q_seq.insert_str(*current_offset as usize, &del_str);
             *current_offset += count;
         }
-        _ => {} // TODO: handle 'H' for SAM
+        _ => return Err(WGAError::CigarOpInvalid(op.to_string())), // TODO: handle 'H' for SAM
     };
     Ok(())
 }
@@ -568,7 +568,7 @@ pub fn parse_paf_to_cigar<T: AlignRecord>(rec: &T) -> Result<Cigar, WGAError> {
                             del_count += cigarunit.len as usize;
                         }
                     }
-                    _ => {}
+                    _ => return Err(WGAError::CigarOpInvalid(cigarunit.op.to_string())), // TODO: handle 'H' for SAM
                 };
                 current_offset += cigarunit.len;
             }
