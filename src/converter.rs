@@ -150,7 +150,6 @@ pub fn paf2chain<R: Read + Send>(
         writer.write_all(format!("{}", header).as_bytes())?;
 
         // nom the cigar string and write to file
-        // TODO: handle IResult error
         parse_cigar_to_chain(&record, writer)?;
 
         // additional newline for standard chain format
@@ -310,7 +309,6 @@ pub fn chain2maf<R: Read + Send>(
                 whole_q_seq = reverse_complement(&whole_q_seq);
             }
         }
-
         // read chain dataline and insert the `-` to sequence
         parse_chain_to_insert(&chainrec, &mut whole_t_seq, &mut whole_q_seq)?;
         // get s-lines
@@ -351,10 +349,9 @@ fn parse_chain_to_insert(
 ) -> Result<(), WGAError> {
     let mut current_offset = 0;
     for dataline in &rec.lines {
-        let match_len = dataline.size - current_offset;
         let ins_len = dataline.target_diff;
         let del_len = dataline.query_diff;
-        current_offset += match_len;
+        current_offset += dataline.size;
         match ins_len {
             0 => {}
             _ => {
