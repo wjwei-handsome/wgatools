@@ -16,7 +16,7 @@ pub fn filter_chain<R: Read + Send>(
     min_block_size: u64,
     min_query_size: u64,
 ) -> Result<(), WGAError> {
-    for rec in reader.records() {
+    for rec in reader.records()? {
         println!("www");
         let rec = rec?;
         let rec = filter_alignrec(&rec, min_block_size, min_query_size)?;
