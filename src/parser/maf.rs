@@ -412,10 +412,10 @@ impl AlignRecord for MAFRecord {
         &self.slines[0].seq
     }
 
-    fn get_stat(&self) -> RecStat {
+    fn get_stat(&self) -> Result<RecStat, WGAError> {
         // just convert cigar to stat
         let cigar = parse_maf_seq_to_cigar(self, false);
-        RecStat::from(cigar)
+        Ok(RecStat::from(cigar))
     }
 }
 

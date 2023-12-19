@@ -167,7 +167,7 @@ pub trait AlignRecord {
     fn target_seq(&self) -> &str {
         ""
     }
-    fn get_stat(&self) -> RecStat {
-        RecStat::default()
+    fn get_stat(&self) -> Result<RecStat, WGAError> {
+        Ok(RecStat::default())
     }
 }
