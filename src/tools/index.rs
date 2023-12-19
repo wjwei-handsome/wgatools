@@ -4,6 +4,7 @@ use std::{
     io::{Seek, Write},
 };
 
+use anyhow::anyhow;
 use itertools::enumerate;
 use serde::{Deserialize, Serialize};
 
@@ -45,12 +46,16 @@ pub fn build_index(
                 size,
                 ord,
             });
-            idx.get_mut(&name).unwrap().ivls.push(IvP {
-                start,
-                end,
-                strand,
-                offset,
-            });
+
+            idx.get_mut(&name)
+                .ok_or(WGAError::Other(anyhow!("not excepted")))?
+                .ivls
+                .push(IvP {
+                    start,
+                    end,
+                    strand,
+                    offset,
+                });
         }
     }
     // write index to file if not empty
