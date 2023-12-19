@@ -1,22 +1,32 @@
 use log::error;
 use wgalib::cli::{make_cli_parse, Commands};
+use wgalib::errors::WGAError;
 use wgalib::log::init_logger;
 use wgalib::tools::tview::tview;
 use wgalib::utils::{
-    chain2maf, chain2paf, maf2chain, maf2paf, maf2sam, paf2chain, paf2maf, wrap_build_index,
-    wrap_filter, wrap_maf_call, wrap_maf_extract, wrap_stat,
+    wrap_build_index, wrap_chain2maf, wrap_chain2paf, wrap_filter, wrap_maf2chain, wrap_maf2paf,
+    wrap_maf2sam, wrap_maf_call, wrap_maf_extract, wrap_paf2chain, wrap_paf2maf, wrap_stat,
 };
 
 fn main() {
-    let cli = make_cli_parse();
+    match main_entry() {
+        Ok(_) => {}
+        Err(e) => {
+            error!("{}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn main_entry() -> Result<(), WGAError> {
+    let cli = make_cli_parse(); // TODO: handle parse error
     let verbose = cli.verbose;
 
     init_logger(verbose);
 
     rayon::ThreadPoolBuilder::new()
         .num_threads(cli.threads)
-        .build_global()
-        .unwrap(); // TODO: handle threadpool error
+        .build_global()?;
 
     let outfile = cli.outfile;
     let rewrite = cli.rewrite;
@@ -26,29 +36,37 @@ fn main() {
 
     match &cli.command {
         Commands::Maf2Paf { input } => {
-            maf2paf(input, &outfile, rewrite);
+            wrap_maf2paf(input, &outfile, rewrite)?;
         }
         Commands::Paf2Maf {
             input,
             target,
             query,
         } => {
-            paf2maf(input, &outfile, target, query, rewrite);
+            wrap_paf2maf(input, &outfile, target, query, rewrite)?;
         }
-        Commands::Paf2Chain { input } => paf2chain(input, &outfile, rewrite),
-        Commands::Chain2Paf { input } => chain2paf(input, &outfile, rewrite),
+        Commands::Paf2Chain { input } => {
+            wrap_paf2chain(input, &outfile, rewrite)?;
+        }
+        Commands::Chain2Paf { input } => {
+            wrap_chain2paf(input, &outfile, rewrite)?;
+        }
         Commands::Chain2Maf {
             input,
             target,
             query,
-        } => chain2maf(input, &outfile, target, query, rewrite),
-        Commands::Maf2Chain { input } => maf2chain(input, &outfile, rewrite),
+        } => {
+            wrap_chain2maf(input, &outfile, target, query, rewrite)?;
+        }
+        Commands::Maf2Chain { input } => {
+            wrap_maf2chain(input, &outfile, rewrite)?;
+        }
         Commands::MafExtract {
             input,
             regions,
             file,
         } => {
-            wrap_maf_extract(input, regions, file, &outfile, rewrite);
+            wrap_maf_extract(input, regions, file, &outfile, rewrite)?;
         }
         Commands::Call {
             input,
@@ -64,24 +82,22 @@ fn main() {
                 *svlen,
                 false,
                 sample.as_deref(),
-            );
+            )?;
         }
-        Commands::Maf2Sam { input } => maf2sam(input, &outfile, rewrite),
-        Commands::MafIndex { input } => wrap_build_index(input, &outfile),
-        Commands::Tview { input, step } => match tview(input, *step) {
-            Ok(_) => {}
-            Err(err) => {
-                error!("{}", err);
-                std::process::exit(1);
-            }
-        },
+        Commands::Maf2Sam { input } => {
+            wrap_maf2sam(input, &outfile, rewrite)?;
+        }
+        Commands::MafIndex { input } => {
+            wrap_build_index(input, &outfile)?;
+        }
+        Commands::Tview { input, step } => {
+            tview(input, *step)?;
+        }
         Commands::Stat {
             input,
             format,
             each,
-        } => {
-            wrap_stat(*format, input, &outfile, rewrite, *each);
-        }
+        } => wrap_stat(*format, input, &outfile, rewrite, *each)?,
         Commands::Dotplot {} => {
             wgalib::tools::dotplot::chart();
         }
@@ -98,7 +114,8 @@ fn main() {
                 rewrite,
                 *min_block_size,
                 *min_query_size,
-            );
+            )?;
         }
     }
+    Ok(())
 }
