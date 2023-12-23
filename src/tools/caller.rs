@@ -234,9 +234,18 @@ fn call_within_var(
             }
             'I' => {
                 if len > svlen_cutoff {
+                    // This case for:
+                    // target: AAAAA
+                    // queryy: -----
+                    if target_current_offset == t_start {
+                        target_current_offset += 1
+                    };
                     let t_slice_start = (target_current_offset - t_start - 1) as usize;
                     let t_slice_end = t_slice_start + 1;
 
+                    if query_current_offset == q_start {
+                        query_current_offset += 1
+                    };
                     let q_slice_start = (query_current_offset - q_start - 1) as usize;
                     let q_slice_end = q_slice_start + len as usize + 1;
 
@@ -271,9 +280,15 @@ fn call_within_var(
             }
             'D' => {
                 if len > svlen_cutoff {
+                    if target_current_offset == t_start {
+                        target_current_offset += 1
+                    };
                     let t_slice_start = (target_current_offset - t_start - 1) as usize;
                     let t_slice_end = t_slice_start + len as usize + 1;
 
+                    if query_current_offset == q_start {
+                        query_current_offset += 1
+                    };
                     let q_slice_start = (query_current_offset - q_start - 1) as usize;
                     let q_slice_end = q_slice_start + 1;
 
