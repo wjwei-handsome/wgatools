@@ -7,6 +7,7 @@ use crate::{
         filter::{filter_chain, filter_maf, filter_paf},
         index::{build_index, MafIndex},
         mafextra::maf_extract_idx,
+        rename::rename_maf,
         stat::{stat_maf, stat_paf},
     },
 };
@@ -370,5 +371,20 @@ pub fn wrap_filter(
             return Err(WGAError::NotImplemented);
         }
     }
+    Ok(())
+}
+
+/// A wrapper for filter sub-cmd, match format and call `filter_{maf,paf}`
+pub fn wrap_rename_maf(
+    input: &Option<String>,
+    output: &str,
+    rewrite: bool,
+    prefixs: &[String],
+) -> Result<(), WGAError> {
+    // prepare reader and writer
+    let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
+    let mafrdr = MAFReader::new(reader)?;
+    let prefixs = prefixs.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
+    rename_maf(mafrdr, &mut writer, prefixs)?;
     Ok(())
 }
