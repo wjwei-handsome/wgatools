@@ -172,6 +172,16 @@ pub enum Commands {
         #[arg(required = false, long, short = 'q', default_value = "0")]
         min_query_size: u64,
     },
+    /// Rename MAF records with prefix
+    #[command(visible_alias = "rn", name = "rename")]
+    Rename {
+        /// Input MAF File, None for STDIN
+        #[arg(required = false)]
+        input: Option<String>,
+        /// prefix for rename, split by ',' ordered by input
+        #[arg(required = true, long, short, value_delimiter = ',')]
+        prefixs: Vec<String>,
+    },
     /// TEST: maf2sam
     #[command(visible_alias = "m2s", name = "maf2sam")]
     Maf2Sam {
