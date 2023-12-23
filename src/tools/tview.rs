@@ -1,24 +1,20 @@
+use crate::tools::index::MafIndex;
+use crate::{errors::WGAError, parser::maf::MAFReader};
+use crossterm::{
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
 use itertools::enumerate;
+use ratatui::{prelude::*, widgets::*};
 use regex::Regex;
+use rust_lapper::{Interval, Lapper};
 use std::{
     fs::File,
     io::{self, BufReader, Read, Seek},
     rc::Rc,
     time::{Duration, Instant},
 };
-
-use rust_lapper::{Interval, Lapper};
-
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use ratatui::{prelude::*, widgets::*};
-
-use crate::{errors::WGAError, parser::maf::MAFReader};
-
-use super::index::MafIndex;
 
 const WINDOW_SIZE: usize = 20;
 

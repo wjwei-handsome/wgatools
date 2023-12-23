@@ -1,7 +1,6 @@
+use crate::parser::common::FileFormat;
 use clap::ArgAction;
 use clap::{command, Parser, Subcommand};
-
-use crate::parser::common::FileFormat;
 
 #[derive(Parser)]
 #[command(name = "wgatools")]

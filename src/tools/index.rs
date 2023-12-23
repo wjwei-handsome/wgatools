@@ -1,16 +1,14 @@
+use crate::{
+    errors::WGAError,
+    parser::{common::Strand, maf::MAFReader},
+};
+use anyhow::anyhow;
+use itertools::enumerate;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fs::File,
     io::{Seek, Write},
-};
-
-use anyhow::anyhow;
-use itertools::enumerate;
-use serde::{Deserialize, Serialize};
-
-use crate::{
-    errors::WGAError,
-    parser::{common::Strand, maf::MAFReader},
 };
 
 pub fn build_index(

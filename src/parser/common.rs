@@ -1,4 +1,5 @@
 use crate::errors::WGAError;
+use crate::parser::cigar::Cigar;
 use crate::parser::maf::MAFRecord;
 use crate::parser::paf::PafRecord;
 use clap::ValueEnum;
@@ -6,8 +7,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
-
-use super::cigar::Cigar;
 
 /// Enum the file types
 #[derive(Debug, PartialEq, Clone, Copy, ValueEnum)]

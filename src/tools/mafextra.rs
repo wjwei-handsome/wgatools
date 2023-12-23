@@ -1,20 +1,17 @@
+use crate::errors::{ParseGenomeRegionErrKind, WGAError};
+use crate::parser::maf::{MAFReader, MAFWriter};
+use crate::tools::index::{IvP, MafIndex};
+use crate::utils::parse_str2u64;
+use csv::ReaderBuilder;
 use regex::Regex;
+use rust_lapper::{Interval, Lapper};
 use serde::{Deserialize, Serialize};
 use std::cmp::{max, min};
 use std::fmt::Display;
 use std::fs::File;
-use std::io::{BufReader, Write};
-
-use super::index::{IvP, MafIndex};
-
-use crate::errors::{ParseGenomeRegionErrKind, WGAError};
-use crate::parser::maf::{MAFReader, MAFWriter};
-use crate::utils::parse_str2u64;
-use csv::ReaderBuilder;
 use std::io::Read;
 use std::io::Seek;
-
-use rust_lapper::{Interval, Lapper};
+use std::io::{BufReader, Write};
 
 // fn maf_extract_iter<R: Read>(
 //     _regions: &Option<Vec<String>>,

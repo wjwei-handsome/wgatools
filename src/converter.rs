@@ -1,4 +1,3 @@
-// TODO: manage uses
 use crate::errors::WGAError;
 use crate::parser::chain::{ChainHeader, ChainReader, ChainRecord};
 use crate::parser::cigar::{
