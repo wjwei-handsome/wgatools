@@ -288,9 +288,14 @@ pub fn wrap_maf_call(
                 None
             } else {
                 let index_path = format!("{}.index", path);
-                let index_rdr = BufReader::new(File::open(index_path)?);
-                let mafindex: MafIndex = serde_json::from_reader(index_rdr)?;
-                Some(mafindex)
+                match File::open(index_path) {
+                    Err(_) => None,
+                    Ok(index_file) => {
+                        let index_rdr = BufReader::new(index_file);
+                        let mafindex: MafIndex = serde_json::from_reader(index_rdr)?;
+                        Some(mafindex)
+                    }
+                }
             }
         }
         None => None,
