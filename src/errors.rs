@@ -35,7 +35,7 @@ pub enum WGAError {
     ParseGenomeRegion(ParseGenomeRegionErrKind),
     #[error("Failed region: {0}")]
     FailedRegion(GenomeRegion),
-    #[error("Duplicate name `{0}` in a record not allowed, please check or use `modname`")]
+    #[error("Duplicate name `{0}` in a record not allowed, please check or use `rename`")]
     DuplicateName(String),
     #[error("Format {0} Parse Error by rust::nom, please check")]
     NomErr(#[from] nom::error::Error<String>),
@@ -69,6 +69,8 @@ pub enum WGAError {
     InvalidBase(String),
     #[error("Ah-oh! NOT IMPLEMENTED :(")]
     NotImplemented,
+    #[error("S-line count not match")]
+    SLineCountNotMatch,
     // Other error
     #[error(transparent)]
     Other(#[from] anyhow::Error),
