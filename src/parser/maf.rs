@@ -104,7 +104,6 @@ impl MAFSLine {
     pub fn set_size(&mut self, size: u64) {
         self.size = size;
     }
-
     pub fn set_name(&mut self, name: String) {
         self.name = name;
     }
@@ -220,6 +219,19 @@ impl MAFRecord {
             sline.set_align_size(pre_align_size - gap_size);
             sline.seq = new_seq;
         }
+    }
+
+    pub fn rename(&mut self, prefixs: &Vec<&str>) -> Result<(), WGAError> {
+        // check prefixs length and slines length
+        if prefixs.len() != self.slines.len() {
+            return Err(WGAError::SLineCountNotMatch);
+        }
+        for (order, sline) in self.slines.iter_mut().enumerate() {
+            let prefix = prefixs[order];
+            let new_name = format!("{}{}", prefix, sline.name);
+            sline.set_name(new_name);
+        }
+        Ok(())
     }
 }
 
