@@ -224,28 +224,34 @@ fn call_within_var(
     if strand == Strand::Negative {
         init_info.push_str("INV_NEST=TRUE;");
     }
-
+    let mut after_m = false;
     for (k, g) in group_by_iter.into_iter() {
         let len = g.count() as u64;
         match k {
             '=' => {
                 target_current_offset += len;
                 query_current_offset += len;
+                after_m = true;
             }
             'I' => {
                 if len > svlen_cutoff {
                     // This case for:
-                    // target: AAAAA
-                    // queryy: -----
-                    if target_current_offset == t_start {
-                        target_current_offset += 1
-                    };
+                    // t: ----A
+                    // q: AAAAA
+                    // This case for:
+                    // t: TTGGG---
+                    // q: TT---AAA
+                    // This case for:
+                    // t: GGG---
+                    // q: ---AAA
+                    if !after_m {
+                        query_current_offset += len;
+                        after_m = false;
+                        continue;
+                    }
                     let t_slice_start = (target_current_offset - t_start - 1) as usize;
                     let t_slice_end = t_slice_start + 1;
 
-                    if query_current_offset == q_start {
-                        query_current_offset += 1
-                    };
                     let q_slice_start = (query_current_offset - q_start - 1) as usize;
                     let q_slice_end = q_slice_start + len as usize + 1;
 
@@ -277,18 +283,32 @@ fn call_within_var(
                     var_recs.push(record?);
                 }
                 query_current_offset += len;
+                after_m = false;
             }
             'D' => {
                 if len > svlen_cutoff {
-                    if target_current_offset == t_start {
-                        target_current_offset += 1
-                    };
+                    // for this case:
+                    // t: AAAAA
+                    // q: ----A
+                    // for this case:
+                    // t: TT---AAAAA
+                    // q: TTGGG----A
+                    // for this case:
+                    // t: ---AAAAA
+                    // q: GGG----A
+
+                    // normal case:
+                    // t: TTAAAAA
+                    // q: TT----A
+                    if !after_m {
+                        target_current_offset += len;
+                        after_m = false;
+                        continue;
+                    }
+
                     let t_slice_start = (target_current_offset - t_start - 1) as usize;
                     let t_slice_end = t_slice_start + len as usize + 1;
 
-                    if query_current_offset == q_start {
-                        query_current_offset += 1
-                    };
                     let q_slice_start = (query_current_offset - q_start - 1) as usize;
                     let q_slice_end = q_slice_start + 1;
 
@@ -317,6 +337,7 @@ fn call_within_var(
                     var_recs.push(record?);
                 }
                 target_current_offset += len;
+                after_m = false;
             }
             'X' => {
                 if if_snp {
@@ -345,6 +366,7 @@ fn call_within_var(
                     query_current_offset += len;
                     target_current_offset += len;
                 }
+                after_m = true;
             }
             _ => {}
         }
