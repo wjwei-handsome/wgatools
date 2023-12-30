@@ -69,6 +69,11 @@ pub fn reverse_complement(input: &str) -> Result<String, WGAError> {
             'G' => output.push('C'),
             'T' => output.push('A'),
             'N' => output.push('N'),
+            'a' => output.push('t'),
+            'c' => output.push('g'),
+            'g' => output.push('c'),
+            't' => output.push('a'),
+            'n' => output.push('n'),
             _ => return Err(WGAError::InvalidBase(c.to_string())),
         }
     }
