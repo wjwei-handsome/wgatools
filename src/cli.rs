@@ -56,7 +56,7 @@ pub enum Commands {
         #[arg(required = false)]
         input: Option<String>,
         /// Input target FASTA File, required
-        #[arg(required = true, long, short)]
+        #[arg(required = true, long, short = 'g')]
         target: String,
         /// Input query FASTA File, required
         #[arg(required = true, long, short)]
