@@ -189,6 +189,13 @@ pub enum Commands {
         #[arg(required = false)]
         input: Option<String>,
     },
+    /// TEST: pafcov
+    #[command(visible_alias = "pc", name = "pafcov")]
+    PafCov {
+        /// Input PAF File, None for STDIN
+        #[arg(required = false)]
+        input: Option<String>,
+    },
 }
 
 pub fn make_cli_parse() -> Cli {
