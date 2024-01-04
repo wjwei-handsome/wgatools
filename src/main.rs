@@ -5,8 +5,8 @@ use wgalib::log::init_logger;
 use wgalib::tools::tview::tview;
 use wgalib::utils::{
     wrap_build_index, wrap_chain2maf, wrap_chain2paf, wrap_filter, wrap_maf2chain, wrap_maf2paf,
-    wrap_maf2sam, wrap_maf_call, wrap_maf_extract, wrap_paf2chain, wrap_paf2maf, wrap_rename_maf,
-    wrap_stat,
+    wrap_maf2sam, wrap_maf_call, wrap_maf_extract, wrap_paf2chain, wrap_paf2maf, wrap_paf_cov,
+    wrap_rename_maf, wrap_stat,
 };
 
 fn main() {
@@ -119,6 +119,9 @@ fn main_entry() -> Result<(), WGAError> {
         }
         Commands::Rename { input, prefixs } => {
             wrap_rename_maf(input, &outfile, rewrite, prefixs)?;
+        }
+        Commands::PafCov { input } => {
+            wrap_paf_cov(input, &outfile, rewrite)?;
         }
     }
     Ok(())
