@@ -591,3 +591,37 @@ pub fn parse_paf_to_cigar<T: AlignRecord>(rec: &T) -> Result<Cigar, WGAError> {
         inv_event,
     })
 }
+
+/// Parse CIGAR to Cigar struct and stat cov
+pub fn update_cov_vec(cov_vec: &mut Vec<u64>, cigar: &str, start: usize) -> Result<(), WGAError> {
+    let (cigar, _tag) = tag("cg:Z:")(cigar)?;
+    let mut pos = start;
+    let (_, res) = fold_many1(
+        parse_cigar_str_tuple,
+        null,
+        |res: Result<(), WGAError>, cigarunit| {
+            if res.is_ok() {
+                let cigarunit = cst2cu(cigarunit)?;
+                let length = cigarunit.len as usize;
+                match cigarunit.op {
+                    'M' | '=' => {
+                        for i in pos..(pos + length) {
+                            if i < cov_vec.len() {
+                                cov_vec[i] += 1;
+                            }
+                        }
+                        pos += length;
+                    }
+                    'I' | 'S' => {}
+
+                    _ => {
+                        pos += length;
+                    }
+                };
+            }
+            res
+        },
+    )(cigar)?;
+    res?;
+    Ok(())
+}
