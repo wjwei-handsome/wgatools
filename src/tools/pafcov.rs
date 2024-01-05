@@ -40,7 +40,15 @@ pub fn pafcov<R: Read + Send>(
             Ok::<HashMap<String, Vec<usize>>, WGAError>(acc)
         })
         .try_reduce(HashMap::new, |mut acc, mut map| {
-            acc.extend(map.drain());
+            // acc.extend(map.drain());
+            // accumulate count
+            // SHIT!!: WHY NOT JUST ITERATOR
+            for (target, cov_vec) in map.drain() {
+                let acc_vec = acc.entry(target).or_insert(vec![0; cov_vec.len()]);
+                for (acc, cov) in acc_vec.iter_mut().zip(cov_vec) {
+                    *acc += cov;
+                }
+            }
             Ok(acc)
         })?;
 
