@@ -78,7 +78,7 @@ pub struct GenomeRegion {
 impl TryFrom<String> for GenomeRegion {
     type Error = WGAError;
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        let re = Regex::new(r"^([a-zA-Z0-9.@_-]+):([0-9]+)-([0-9]+)$")?;
+        let re = Regex::new(r"^([a-zA-Z0-9.@_#-]+):([0-9]+)-([0-9]+)$")?;
         match re.captures(&value) {
             Some(caps) => {
                 let name = caps
