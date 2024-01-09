@@ -27,10 +27,8 @@ pub fn generate_pesudo_maf<R: Read + Send>(
         let target_name = rec.target_name().to_string();
         let query_name = rec.query_name().to_string();
         let target_start = rec.target_start();
-        let query_recs_map = target_qeury_recs_map
-            .entry(target_name)
-            .or_insert(HashMap::new());
-        let query_rec_vec = query_recs_map.entry(query_name).or_insert(Vec::new());
+        let query_recs_map = target_qeury_recs_map.entry(target_name).or_default();
+        let query_rec_vec = query_recs_map.entry(query_name).or_default();
         // sort by target start
         let idx = query_rec_vec
             .binary_search_by(|probe| probe.target_start().cmp(&target_start))
