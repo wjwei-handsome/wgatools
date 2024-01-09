@@ -625,3 +625,41 @@ pub fn update_cov_vec(cov_vec: &mut Vec<usize>, cigar: &str, start: usize) -> Re
     res?;
     Ok(())
 }
+
+/// Parse CIGAR to generate pesudo MAF
+pub fn gen_pesudo_maf_by_cigar(cigar: &str) -> Result<String, WGAError> {
+    let (cigar, _tag) = tag("cg:Z:")(cigar)?;
+    let mut seq_line = String::new();
+    let (_, res) = fold_many1(
+        parse_cigar_str_tuple,
+        null,
+        |res: Result<(), WGAError>, cigarunit| {
+            if res.is_ok() {
+                let cigarunit = cst2cu(cigarunit)?;
+                let length = cigarunit.len as usize;
+                match cigarunit.op {
+                    'M' | '=' => {
+                        for _ in 0..length {
+                            seq_line.push('1');
+                        }
+                    }
+                    'I' | 'S' => {}
+                    'D' => {
+                        for _ in 0..length {
+                            seq_line.push('-');
+                        }
+                    }
+                    'X' => {
+                        for _ in 0..length {
+                            seq_line.push('0');
+                        }
+                    }
+                    _ => {}
+                };
+            }
+            res
+        },
+    )(cigar)?;
+    res?;
+    Ok(seq_line)
+}
