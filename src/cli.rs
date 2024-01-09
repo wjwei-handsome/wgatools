@@ -196,6 +196,13 @@ pub enum Commands {
         #[arg(required = false)]
         input: Option<String>,
     },
+    /// TEST: generate pesudo maf from paf
+    #[command(visible_alias = "pp", name = "pafpesudo")]
+    PafPesudo {
+        /// Input PAF File, None for STDIN
+        #[arg(required = false)]
+        input: Option<String>,
+    },
 }
 
 pub fn make_cli_parse() -> Cli {
