@@ -554,7 +554,7 @@ fn ivvec2strvec(invec: &[Iv]) -> Vec<String> {
 }
 
 fn input_valid_update(app: &mut MafViewApp<'_, File>) -> Result<(), WGAError> {
-    let re = Regex::new(r"^[a-zA-Z0-9.@_-#]+:[0-9]+(-[0-9]+)?$")?; // NO ERROR
+    let re = Regex::new(r"^[a-zA-Z0-9.@-_#]+:[0-9]+-[0-9]+?$")?; // NO ERROR
     match re.is_match(&app.navigation.input[6..]) {
         true => {
             let name = &app.navigation.input[6..].split(':').collect::<Vec<&str>>()[0];
