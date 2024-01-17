@@ -627,9 +627,14 @@ pub fn update_cov_vec(cov_vec: &mut Vec<usize>, cigar: &str, start: usize) -> Re
 }
 
 /// Parse CIGAR to generate pesudo MAF
-pub fn gen_pesudo_maf_by_cigar(cigar: &str) -> Result<String, WGAError> {
+pub fn gen_pesudo_maf_by_cigar(
+    cigar: &str,
+    raw_q_seq: &mut String,
+    base: bool,
+) -> Result<(), WGAError> {
     let (cigar, _tag) = tag("cg:Z:")(cigar)?;
-    let mut seq_line = String::new();
+    let mut current_offset = 0;
+    // let mut seq_line = String::new();
     let (_, res) = fold_many1(
         parse_cigar_str_tuple,
         null,
@@ -639,19 +644,39 @@ pub fn gen_pesudo_maf_by_cigar(cigar: &str) -> Result<String, WGAError> {
                 let length = cigarunit.len as usize;
                 match cigarunit.op {
                     'M' | '=' => {
-                        for _ in 0..length {
-                            seq_line.push('1');
+                        if base {
+                            current_offset += length;
+                        } else {
+                            for _ in 0..length {
+                                raw_q_seq.push('1');
+                            }
                         }
                     }
-                    'I' | 'S' => {}
+                    'I' | 'S' => {
+                        if base {
+                            // del from whole_q_seq
+                            raw_q_seq.drain(current_offset..(current_offset + length));
+                        } else {
+                            // do nothing
+                        }
+                    }
                     'D' => {
-                        for _ in 0..length {
-                            seq_line.push('-');
+                        if base {
+                            raw_q_seq.insert_str(current_offset, &"-".repeat(length));
+                            current_offset += length;
+                        } else {
+                            for _ in 0..length {
+                                raw_q_seq.push('-');
+                            }
                         }
                     }
                     'X' => {
-                        for _ in 0..length {
-                            seq_line.push('0');
+                        if base {
+                            current_offset += length;
+                        } else {
+                            for _ in 0..length {
+                                raw_q_seq.push('0');
+                            }
                         }
                     }
                     _ => {}
@@ -661,5 +686,5 @@ pub fn gen_pesudo_maf_by_cigar(cigar: &str) -> Result<String, WGAError> {
         },
     )(cigar)?;
     res?;
-    Ok(seq_line)
+    Ok(())
 }
