@@ -197,7 +197,7 @@ pub enum Commands {
         input: Option<String>,
     },
     /// TEST: generate pesudo maf from paf
-    #[command(visible_alias = "pp", name = "pafpesudo")]
+    #[command(visible_alias = "pp", name = "pafpseudo")]
     PafPseudo {
         /// Input PAF File, None for STDIN
         #[arg(required = false)]
