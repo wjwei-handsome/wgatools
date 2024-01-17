@@ -414,9 +414,11 @@ pub fn wrap_paf_pesudo_maf(
     input: &Option<String>,
     output: &str,
     rewrite: bool,
+    fa_path: &Option<String>,
+    target: &Option<String>,
 ) -> Result<(), WGAError> {
     let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
     let pafrdr = PAFReader::new(reader);
-    generate_pesudo_maf(pafrdr, &mut writer)?;
+    generate_pesudo_maf(pafrdr, &mut writer, fa_path, target)?;
     Ok(())
 }

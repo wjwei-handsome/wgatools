@@ -123,8 +123,12 @@ fn main_entry() -> Result<(), WGAError> {
         Commands::PafCov { input } => {
             wrap_paf_cov(input, &outfile, rewrite)?;
         }
-        Commands::PafPesudo { input } => {
-            wrap_paf_pesudo_maf(input, &outfile, rewrite)?;
+        Commands::PafPseudo {
+            input,
+            fasta,
+            target,
+        } => {
+            wrap_paf_pesudo_maf(input, &outfile, rewrite, fasta, target)?;
         }
     }
     Ok(())
