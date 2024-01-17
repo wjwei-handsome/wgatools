@@ -198,10 +198,16 @@ pub enum Commands {
     },
     /// TEST: generate pesudo maf from paf
     #[command(visible_alias = "pp", name = "pafpesudo")]
-    PafPesudo {
+    PafPseudo {
         /// Input PAF File, None for STDIN
         #[arg(required = false)]
         input: Option<String>,
+        /// Input FASTA File with index(support .gz), if None, just output `N`,`1`,`0`,`-`
+        #[arg(required = false, long, short)]
+        fasta: Option<String>,
+        /// select target for output
+        #[arg(required = false, long, short = 'g')]
+        target: Option<String>,
     },
 }
 
