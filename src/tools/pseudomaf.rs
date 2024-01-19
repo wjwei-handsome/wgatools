@@ -132,7 +132,7 @@ fn write_pmaf(
                     query_name, query_size, query_size
                 )?;
                 // fill the head with '-'
-                println!("start gap len: {}", target_start);
+                // println!("start gap len: {}", target_start);
                 for _ in 0..target_start {
                     write!(writer, "-")?;
                 }
@@ -145,12 +145,12 @@ fn write_pmaf(
             // fill the gap between two query recs from second query rec
             if !first_query_flag {
                 let gap_len = rec.target_start() - last_target_end;
-                println!(
-                    "curr_start:{} - last_end:{} = gap_len: {}",
-                    rec.target_start(),
-                    last_target_end,
-                    gap_len
-                );
+                // println!(
+                //     "curr_start:{} - last_end:{} = gap_len: {}",
+                //     rec.target_start(),
+                //     last_target_end,
+                //     gap_len
+                // );
                 for _ in 0..gap_len {
                     write!(writer, "-")?;
                 }
@@ -174,10 +174,10 @@ fn write_pmaf(
         }
         // fill the tail with '-'
         let tail_len = target_size - last_target_end;
-        println!(
-            "target_size:{} - last_end:{} = tail_len: {}",
-            target_size, last_target_end, tail_len
-        );
+        // println!(
+        //     "target_size:{} - last_end:{} = tail_len: {}",
+        //     target_size, last_target_end, tail_len
+        // );
         for _ in 0..tail_len {
             write!(writer, "-")?;
         }
