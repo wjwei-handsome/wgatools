@@ -12,6 +12,9 @@ pub enum WGAError {
     // File path not exist
     #[error("File path `{0}` not exist")]
     FileNotExist(std::path::PathBuf),
+    // Not Dir
+    #[error("Path `{0}` is not a dir")]
+    NotDir(std::path::PathBuf),
     // Parse MAF Error
     #[error("Parse MAF error by: {0}")]
     ParseMaf(ParseMafErrKind),
