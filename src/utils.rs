@@ -426,6 +426,9 @@ pub fn wrap_paf_pesudo_maf(
     info!("start read file: `{}`", input_name);
 
     info!("start write file to dir: `{}`", output);
+    if output == "-" {
+        return Err(WGAError::StdoutNotAllowed);
+    }
     // judge if outputdir if exists
     let outputdir = Path::new(output);
     if !outputdir.exists() {
