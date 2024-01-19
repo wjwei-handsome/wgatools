@@ -34,6 +34,8 @@ pub enum WGAError {
     EmptyRegion,
     #[error("Stdin not allowed here")]
     StdinNotAllowed,
+    #[error("Stdout not allowed here")]
+    StdoutNotAllowed,
     #[error("Parse Genome Region Error By: {0}")]
     ParseGenomeRegion(ParseGenomeRegionErrKind),
     #[error("Failed region: {0}")]
