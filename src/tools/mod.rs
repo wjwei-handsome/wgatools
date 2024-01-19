@@ -7,4 +7,5 @@ pub mod pafcov;
 pub mod pseudomaf;
 pub mod rename;
 pub mod stat;
+pub mod trimovp;
 pub mod tview;

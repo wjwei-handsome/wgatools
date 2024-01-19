@@ -209,6 +209,13 @@ pub enum Commands {
         #[arg(required = false, long, short = 'g')]
         target: Option<String>,
     },
+    /// TEST: trim overlap for paf
+    #[command(visible_alias = "tr", name = "trimovp")]
+    TrimOvp {
+        /// Input PAF File, None for STDIN
+        #[arg(required = false)]
+        input: Option<String>,
+    },
 }
 
 pub fn make_cli_parse() -> Cli {

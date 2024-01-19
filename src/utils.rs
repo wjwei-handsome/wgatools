@@ -11,6 +11,7 @@ use crate::{
         pseudomaf::generate_pesudo_maf,
         rename::rename_maf,
         stat::{stat_maf, stat_paf},
+        trimovp::trim_ovp,
     },
 };
 use log::{info, warn};
@@ -417,8 +418,45 @@ pub fn wrap_paf_pesudo_maf(
     fa_path: &Option<String>,
     target: &Option<String>,
 ) -> Result<(), WGAError> {
+    // get input name for INFO
+    let input_name = match input {
+        Some(path) => path,
+        None => "stdin",
+    };
+    info!("start read file: `{}`", input_name);
+
+    info!("start write file to dir: `{}`", output);
+    // judge if outputdir if exists
+    let outputdir = Path::new(output);
+    if !outputdir.exists() {
+        std::fs::create_dir_all(outputdir)?;
+    } else {
+        // judge if outputdir is dir
+        if !outputdir.is_dir() {
+            return Err(WGAError::NotDir(outputdir.to_path_buf()));
+        }
+        // if rewrite
+        if rewrite {
+            warn!("output dir `{}` exists, will rewrite it", output);
+        } else {
+            return Err(WGAError::FileReWrite(output.to_string()));
+        }
+    }
+    // get a reader
+    let reader = get_input_reader(input)?;
+    let pafrdr = PAFReader::new(reader);
+    generate_pesudo_maf(pafrdr, output, fa_path, target)?;
+    Ok(())
+}
+
+/// A wrapper for PAF trim overlap
+pub fn wrap_paf_trim_overlap(
+    input: &Option<String>,
+    output: &str,
+    rewrite: bool,
+) -> Result<(), WGAError> {
     let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
     let pafrdr = PAFReader::new(reader);
-    generate_pesudo_maf(pafrdr, &mut writer, fa_path, target)?;
+    trim_ovp(pafrdr, &mut writer)?;
     Ok(())
 }
