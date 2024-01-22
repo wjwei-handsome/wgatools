@@ -47,7 +47,11 @@ fn trim_query(writer: &mut dyn Write, rec_vec: Vec<PafRecord>) -> Result<(), WGA
             .unwrap_or_else(|e| e);
         query_rec_vec.insert(idx, rec);
     }
-    let mut final_rec_vec: Vec<PafRecord> = Vec::new();
+    let mut pafwtr = csv::WriterBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(false)
+        .from_writer(writer);
+    // let mut final_rec_vec = Vec::new();
     // TODO: could be parallel
     for (_, rec_vec) in query_groupby_map {
         // remove overlap by target_start and target_end; keep the longest
@@ -59,7 +63,8 @@ fn trim_query(writer: &mut dyn Write, rec_vec: Vec<PafRecord>) -> Result<(), WGA
             // remove overlap by target_start and target_end; keep the longest
             if rec.target_start() >= last_rec.target_end() {
                 // no overlap
-                final_rec_vec.push(last_rec);
+                // final_rec_vec.push(last_rec);
+                pafwtr.serialize(last_rec)?;
                 last_rec = rec;
             } else if align_size > last_align_size {
                 // overlap, but longer
@@ -69,14 +74,12 @@ fn trim_query(writer: &mut dyn Write, rec_vec: Vec<PafRecord>) -> Result<(), WGA
                 continue;
             }
         }
-        final_rec_vec.push(last_rec);
+        // final_rec_vec.push(last_rec);
+        pafwtr.serialize(last_rec)?;
     }
-    let mut pafwtr = csv::WriterBuilder::new()
-        .delimiter(b'\t')
-        .has_headers(false)
-        .from_writer(writer);
-    for rec in final_rec_vec {
-        pafwtr.serialize(rec)?;
-    }
+
+    // for rec in final_rec_vec {
+    //     pafwtr.serialize(rec)?;
+    // }
     Ok(())
 }
