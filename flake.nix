@@ -4,16 +4,17 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils, ... }: 
+  outputs = { self, nixpkgs, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
           inherit system;
         };
         rustPackage = pkgs.rustPlatform.buildRustPackage {
-          name = "wgatools";
+          pname = "wgatools";
+          version = "1.0";  // Replace with your package's version
           src = self;
-          cargoSha256 = "0000000000000000000000000000000000000000000000000000";
+          cargoSha256 = "0000000000000000000000000000000000000000000000000000"; // Replace after the first build attempt
         };
         dockerImage = pkgs.dockerTools.buildImage {
           name = "wgatools";
@@ -22,10 +23,10 @@
         };
       in {
         packages = {
-          inherit rustPackage;
+          wgatools = rustPackage;
         };
         defaultPackage = {
-          inherit rustPackage;
+          x86_64-linux = rustPackage;
         };
         devShells.default = pkgs.mkShell {
           buildInputs = [ pkgs.rustc pkgs.cargo ];
