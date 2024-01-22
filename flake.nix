@@ -12,9 +12,10 @@
         };
         rustPackage = pkgs.rustPlatform.buildRustPackage {
           pname = "wgatools";
-          version = "1.0";  // Replace with your package's version
+          version = "0.0";
           src = self;
-          cargoSha256 = "0000000000000000000000000000000000000000000000000000"; // Replace after the first build attempt
+          cargoSha256 = "sha256-WvBJMBncDYaom54CJpxPU0805CKaYO8TXiSqxFAWKsg=";
+          nativeBuildInputs = [ pkgs.cmake pkgs.pkg-config pkgs.openssl ];
         };
         dockerImage = pkgs.dockerTools.buildImage {
           name = "wgatools";
