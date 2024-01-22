@@ -110,7 +110,7 @@ fn write_pmaf(
         for rec in rec_vec {
             // write target s-line
             target_size = rec.target_length();
-            let target_start = rec.target_start();
+            // let target_start = rec.target_start();
             if first_flag {
                 write!(
                     writer,
@@ -132,30 +132,23 @@ fn write_pmaf(
                     query_name, query_size, query_size
                 )?;
                 // fill the head with '-'
-                // println!("start gap len: {}", target_start);
-                for _ in 0..target_start {
-                    write!(writer, "-")?;
-                }
-                last_target_end = rec.target_end();
+                // for _ in 0..target_start {
+                //     write!(writer, "-")?;
+                // }
+                // last_target_end = rec.target_end();
             }
             // process rest query recs
             let q_start = rec.query_start();
             let q_end = rec.query_end();
 
             // fill the gap between two query recs from second query rec
-            if !first_query_flag {
-                let gap_len = rec.target_start() - last_target_end;
-                // println!(
-                //     "curr_start:{} - last_end:{} = gap_len: {}",
-                //     rec.target_start(),
-                //     last_target_end,
-                //     gap_len
-                // );
-                for _ in 0..gap_len {
-                    write!(writer, "-")?;
-                }
-                last_target_end = rec.target_end();
+            // if !first_query_flag {
+            let gap_len = rec.target_start() - last_target_end;
+            for _ in 0..gap_len {
+                write!(writer, "-")?;
             }
+            last_target_end = rec.target_end();
+            // }
 
             let mut q_seq = get_sline_seq(fa_path, &query_name, (q_start, q_end), false)?;
             // reverse complement the query sequence if it is on the negative strand
@@ -174,10 +167,6 @@ fn write_pmaf(
         }
         // fill the tail with '-'
         let tail_len = target_size - last_target_end;
-        // println!(
-        //     "target_size:{} - last_end:{} = tail_len: {}",
-        //     target_size, last_target_end, tail_len
-        // );
         for _ in 0..tail_len {
             write!(writer, "-")?;
         }
