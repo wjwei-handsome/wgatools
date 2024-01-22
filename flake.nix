@@ -33,10 +33,6 @@
         dockerImage = {
           inherit dockerImage;
         };
-        // Add the Singularity image here
-        singularityImage = {
-          inherit singularityImage;
-        };
       }
     );
 }
