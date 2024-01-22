@@ -7,7 +7,11 @@ use crate::{
         paf::PAFReader,
     },
 };
-use std::io::{Read, Write};
+use rayon::prelude::*;
+use std::{
+    collections::HashMap,
+    io::{Read, Write},
+};
 
 // filter chain
 pub fn filter_chain<R: Read + Send>(
@@ -97,4 +101,58 @@ fn filter_alignrec<T: AlignRecord>(
     }
 
     Ok(Some(rec))
+}
+
+// main function of filter query-target pairs
+pub fn filter_paf_align_pair<R: Read + Send>(
+    mut reader: PAFReader<R>,
+    writer: &mut dyn Write,
+    filt_align_size: u64,
+) -> Result<(), WGAError> {
+    // parallel read and groupby
+    let (align_size_sum_map, all_recs) = reader
+        .records()
+        .par_bridge()
+        .try_fold(
+            || (HashMap::new(), Vec::new()),
+            |(mut align_size_sum_map, mut all_recs), rec| {
+                let rec = rec?;
+                let q_name = rec.query_name().to_string();
+                let t_name = rec.target_name().to_string();
+                let apx_align_size = rec.target_align_size();
+
+                let key = (q_name, t_name);
+                let entry = align_size_sum_map.entry(key).or_insert(0);
+                *entry += apx_align_size;
+                all_recs.push(rec);
+                Ok::<_, WGAError>((align_size_sum_map, all_recs))
+            },
+        )
+        .try_reduce(
+            || (HashMap::new(), Vec::new()),
+            |(mut align_size_sum_map1, mut all_recs1), (align_size_sum_map2, mut all_recs2)| {
+                for (key, value) in align_size_sum_map2 {
+                    let entry = align_size_sum_map1.entry(key).or_insert(0);
+                    *entry += value;
+                }
+                all_recs1.append(&mut all_recs2);
+                Ok((align_size_sum_map1, all_recs1))
+            },
+        )?;
+
+    let mut pafwtr = csv::WriterBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(false)
+        .from_writer(writer);
+    // filter by align_size_sum
+    for rec in all_recs {
+        let q_name = rec.query_name().to_string();
+        let t_name = rec.target_name().to_string();
+        let key = (q_name, t_name);
+        let align_size_sum = align_size_sum_map.get(&key).unwrap();
+        if *align_size_sum >= filt_align_size {
+            pafwtr.serialize(rec)?;
+        }
+    }
+    Ok(())
 }

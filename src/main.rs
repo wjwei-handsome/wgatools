@@ -107,6 +107,7 @@ fn main_entry() -> Result<(), WGAError> {
             format,
             min_block_size,
             min_query_size,
+            min_align_size,
         } => {
             wrap_filter(
                 *format,
@@ -115,6 +116,7 @@ fn main_entry() -> Result<(), WGAError> {
                 rewrite,
                 *min_block_size,
                 *min_query_size,
+                *min_align_size,
             )?;
         }
         Commands::Rename { input, prefixs } => {

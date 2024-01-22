@@ -4,7 +4,7 @@ use crate::{
     parser::{chain::ChainReader, common::FileFormat, maf::MAFReader, paf::PAFReader},
     tools::{
         caller::call_var_maf,
-        filter::{filter_chain, filter_maf, filter_paf},
+        filter::{filter_chain, filter_maf, filter_paf, filter_paf_align_pair},
         index::{build_index, MafIndex},
         mafextra::maf_extract_idx,
         pafcov::pafcov,
@@ -363,6 +363,7 @@ pub fn wrap_filter(
     rewrite: bool,
     min_block_size: u64,
     min_query_size: u64,
+    min_align_size: Option<u64>,
 ) -> Result<(), WGAError> {
     // prepare reader and writer
     let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
@@ -374,7 +375,13 @@ pub fn wrap_filter(
         }
         FileFormat::Paf => {
             let pafrdr = PAFReader::new(reader);
-            filter_paf(pafrdr, &mut writer, min_block_size, min_query_size)?
+            match min_align_size {
+                Some(min_align_size) => {
+                    warn!("`min_align_size` is set, will not filter paf `min_block_size` and `min_query_size`");
+                    filter_paf_align_pair(pafrdr, &mut writer, min_align_size)?
+                }
+                None => filter_paf(pafrdr, &mut writer, min_block_size, min_query_size)?,
+            }
         }
         FileFormat::Chain => {
             let chainrdr = ChainReader::new(reader);

@@ -171,6 +171,9 @@ pub enum Commands {
         /// Min query size, usually for contigs
         #[arg(required = false, long, short = 'q', default_value = "0")]
         min_query_size: u64,
+        /// Min align size for query-target pair, only for all-to-all alignment paf
+        #[arg(required = false, long, short = 'a', default_value = None)]
+        min_align_size: Option<u64>,
     },
     /// Rename MAF records with prefix
     #[command(visible_alias = "rn", name = "rename")]
