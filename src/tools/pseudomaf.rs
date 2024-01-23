@@ -141,14 +141,26 @@ fn write_pmaf(
             let q_start = rec.query_start();
             let q_end = rec.query_end();
 
+            let mut overlap_len = 0;
             // fill the gap between two query recs from second query rec
-            // if !first_query_flag {
-            let gap_len = rec.target_start() - last_target_end;
-            for _ in 0..gap_len {
-                write!(writer, "-")?;
+            if rec.target_start() > last_target_end {
+                // for this case:
+                // --------------
+                //   -----  ---
+                // we need to fill the gap between two query recs
+                let gap_len = rec.target_start() - last_target_end;
+                for _ in 0..gap_len {
+                    write!(writer, "-")?;
+                }
+            } else {
+                // for this case
+                // --------------
+                //   ------
+                //       ------
+                // we need to modify rec's start position and trim cigar
+                overlap_len = last_target_end - rec.target_start();
             }
             last_target_end = rec.target_end();
-            // }
 
             let mut q_seq = get_sline_seq(fa_path, &query_name, (q_start, q_end), false)?;
             // reverse complement the query sequence if it is on the negative strand
@@ -162,6 +174,10 @@ fn write_pmaf(
             let cigar = rec.get_cigar_str()?;
             gen_pesudo_maf_by_cigar(cigar, &mut q_seq, true_base)?;
             // write modified query sequence
+            // trim head overlap len
+            if overlap_len > 0 {
+                q_seq.drain(0..overlap_len as usize);
+            }
             write!(writer, "{}", q_seq)?;
             first_query_flag = false;
         }
