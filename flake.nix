@@ -15,7 +15,7 @@
           version = "0.0";
           src = self;
           cargoSha256 = "sha256-WvBJMBncDYaom54CJpxPU0805CKaYO8TXiSqxFAWKsg=";
-          nativeBuildInputs = [ pkgs.cmake pkgs.pkg-config pkgs.openssl ];
+          nativeBuildInputs = [ pkgs.cmake pkgs.pkg-config pkgs.openssl pkgs.perl ];
         };
         dockerImage = pkgs.dockerTools.buildImage {
           name = "wgatools";
