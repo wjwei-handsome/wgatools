@@ -20,11 +20,15 @@
         dockerImage = pkgs.dockerTools.buildImage {
           name = "wgatools";
           tag = "latest";
-          contents = [ rustPackage ];
+          copyToRoot = pkgs.buildEnv {
+              name = "docker-root";
+              paths = [ rustPackage ];
+          };
         };
       in {
         packages = {
           wgatools = rustPackage;
+          dockerImage = dockerImage;
         };
         defaultPackage = {
           x86_64-linux = rustPackage;

@@ -48,7 +48,43 @@ or just install from git:
 cargo install --git https://github.com/wjwei-handsome/wgatools.git
 ```
 
-### Usages
+#### Nix
+
+A nix flake is also available. You can build from within the repo like this:
+
+```shell
+nix build .#wgatools
+```
+
+Or directly install from github:
+
+```shell
+nix profile install github:wjwei-handsome/wgatools
+```
+
+#### Docker and Singularity
+
+Using nix, we can derive docker and singularity images:
+
+```shell
+nix build .#dockerImage
+```
+
+First, we load the docker image into the local daemon:
+
+```shell
+docker load < result
+```
+
+It's then possible to pack up a singularity image:
+
+```shell
+singularity build wgatools-$(git log -1 --format=%h --abbrev=8).sif docker-daemon://wgatools:latest
+```
+
+This can be useful when running on HPCs where it might be difficult to build wgatools.
+
+### Usage
 
 ```shell
 > wgatools
