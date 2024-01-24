@@ -11,7 +11,7 @@ use rayon::prelude::*;
 use rust_htslib::faidx;
 use std::{
     collections::HashMap,
-    io::{Read, Write},
+    io::{BufWriter, Read, Write},
 };
 
 // main function of generate pesudo MAF from PAF
@@ -93,9 +93,10 @@ fn write_pmaf(
             .unwrap_or_else(|e| e);
         query_rec_vec.insert(idx, rec);
     }
-
+    let mut writer = BufWriter::new(writer);
     // start output
-    writeln!(writer, "a score=0")?;
+    // writeln!(writer, "a score=0")?;
+    writer.write_all(b"a score=0\n")?;
 
     // init first_flag to true
     let mut first_flag = true;
@@ -118,7 +119,9 @@ fn write_pmaf(
                     target_name, target_size, target_size
                 )?;
                 let whole_t_seq = get_sline_seq(fa_path, target_name, (0, target_size), true)?;
-                writeln!(writer, "{}", whole_t_seq)?;
+                // writeln!(writer, "{}", whole_t_seq)?;
+                writer.write_all(whole_t_seq.as_bytes())?;
+                writer.write_all(b"\n")?;
                 first_flag = false;
             }
             // start write query s-line if first_query_flag is true
@@ -150,14 +153,23 @@ fn write_pmaf(
                 // we need to fill the gap between two query recs
                 let gap_len = rec.target_start() - last_target_end;
                 for _ in 0..gap_len {
-                    write!(writer, "-")?;
+                    // write!(writer, "-")?;
+                    writer.write_all(b"-")?;
                 }
             } else {
                 // for this case
                 // --------------
                 //   ------
                 //       ------
-                // we need to modify rec's start position and trim cigar
+                // we need to modify trim the head of query sequence
+                if last_target_end > rec.target_end() {
+                    // for this case
+                    // --------------
+                    //  --------
+                    //   -----
+                    // we dont need to output this query sequence
+                    continue;
+                }
                 overlap_len = last_target_end - rec.target_start();
             }
             last_target_end = rec.target_end();
@@ -178,13 +190,15 @@ fn write_pmaf(
             if overlap_len > 0 {
                 q_seq.drain(0..overlap_len as usize);
             }
-            write!(writer, "{}", q_seq)?;
+            // write!(writer, "{}", q_seq)?;
+            writer.write_all(q_seq.as_bytes())?;
             first_query_flag = false;
         }
         // fill the tail with '-'
         let tail_len = target_size - last_target_end;
         for _ in 0..tail_len {
-            write!(writer, "-")?;
+            // write!(writer, "-")?;
+            writer.write_all(b"-")?;
         }
         // new line
         writeln!(writer)?;
