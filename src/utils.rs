@@ -4,14 +4,14 @@ use crate::{
     parser::{chain::ChainReader, common::FileFormat, maf::MAFReader, paf::PAFReader},
     tools::{
         caller::call_var_maf,
+        chunk::chunk_maf,
         filter::{filter_chain, filter_maf, filter_paf, filter_paf_align_pair},
         index::{build_index, MafIndex},
         mafextra::maf_extract_idx,
         pafcov::pafcov,
         pseudomaf::generate_pesudo_maf,
         rename::rename_maf,
-        stat::{stat_maf, stat_paf},
-        // trimovp::trim_ovp,
+        stat::{stat_maf, stat_paf}, // trimovp::trim_ovp,
     },
 };
 use log::{info, warn};
@@ -470,3 +470,20 @@ pub fn wrap_paf_pesudo_maf(
 //     trim_ovp(pafrdr, &mut writer)?;
 //     Ok(())
 // }
+
+/// A wrapper for chunk sub-cmd
+pub fn wrap_chunk(
+    input: &Option<String>,
+    output: &str,
+    rewrite: bool,
+    length: u64,
+) -> Result<(), WGAError> {
+    // prepare reader and writer
+    let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
+
+    let mafrdr = MAFReader::new(reader)?;
+
+    // mafrdr.chunk(&mut writer, chunk_count, chunk_length)?;
+    chunk_maf(mafrdr, length, &mut writer)?;
+    Ok(())
+}

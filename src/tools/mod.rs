@@ -1,4 +1,5 @@
 pub mod caller;
+pub mod chunk;
 pub mod dotplot;
 pub mod filter;
 pub mod index;

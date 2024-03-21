@@ -4,9 +4,9 @@ use wgalib::errors::WGAError;
 use wgalib::log::init_logger;
 use wgalib::tools::tview::tview;
 use wgalib::utils::{
-    wrap_build_index, wrap_chain2maf, wrap_chain2paf, wrap_filter, wrap_maf2chain, wrap_maf2paf,
-    wrap_maf2sam, wrap_maf_call, wrap_maf_extract, wrap_paf2chain, wrap_paf2maf, wrap_paf_cov,
-    wrap_paf_pesudo_maf, wrap_rename_maf, wrap_stat,
+    wrap_build_index, wrap_chain2maf, wrap_chain2paf, wrap_chunk, wrap_filter, wrap_maf2chain,
+    wrap_maf2paf, wrap_maf2sam, wrap_maf_call, wrap_maf_extract, wrap_paf2chain, wrap_paf2maf,
+    wrap_paf_cov, wrap_paf_pesudo_maf, wrap_rename_maf, wrap_stat,
 };
 
 fn main() {
@@ -132,8 +132,11 @@ fn main_entry() -> Result<(), WGAError> {
         } => {
             wrap_paf_pesudo_maf(input, &outfile, rewrite, fasta, target)?;
         } // Commands::TrimOvp { input } => {
-          //     wrap_paf_trim_overlap(input, &outfile, rewrite)?;
-          // }
+        //     wrap_paf_trim_overlap(input, &outfile, rewrite)?;
+        // }
+        Commands::Chunk { input, length } => {
+            wrap_chunk(input, &outfile, rewrite, *length)?;
+        }
     }
     Ok(())
 }
