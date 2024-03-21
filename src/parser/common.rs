@@ -174,3 +174,14 @@ pub trait AlignRecord {
         Ok(RecStat::default())
     }
 }
+
+/// Re-count align-size from seqs
+pub fn recount_align_size(seq: &str) -> u64 {
+    let mut align_size = 0;
+    for c in seq.chars() {
+        if c != '-' {
+            align_size += 1;
+        }
+    }
+    align_size
+}
