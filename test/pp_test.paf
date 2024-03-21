@@ -1,3 +1,0 @@
-query1	40	0	30	+	target1	40	0	30	100	100	100	cg:Z:10M10I10=
-query2	40	0	20	+	target1	40	0	30	100	100	100	cg:Z:10M10D10=
-query2	40	30	35	+	target1	40	35	40	100	100	100	cg:Z:4=1X
