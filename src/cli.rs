@@ -219,6 +219,16 @@ pub enum Commands {
     //     #[arg(required = false)]
     //     input: Option<String>,
     // },
+    /// Chunk MAF file by length
+    #[command(visible_alias = "ch", name = "chunk")]
+    Chunk {
+        /// Input MAF File, None for STDIN
+        #[arg(required = false)]
+        input: Option<String>,
+        /// Chunk by length
+        #[arg(required = true, long, short = 'l')]
+        length: u64,
+    },
 }
 
 pub fn make_cli_parse() -> Cli {
