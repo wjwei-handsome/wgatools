@@ -389,14 +389,13 @@ impl AlignRecord for MAFRecord {
         let cigar = parse_maf_seq_to_cigar(self, false);
         let cigar_string = String::from("cg:Z:") + &cigar.cigar_string;
         let matches = cigar.match_count as u64;
-        let block_length =
-            (cigar.match_count + cigar.mismatch_count + cigar.del_count + cigar.inv_del_count)
-                as u64;
-        let edit_dist = cigar.mismatch_count
+        let block_length = (cigar.match_count
+            + cigar.mismatch_count
             + cigar.ins_count
-            + cigar.del_count
             + cigar.inv_ins_count
-            + cigar.inv_del_count;
+            + cigar.del_count
+            + cigar.inv_del_count) as u64;
+        let edit_dist = block_length - matches;
         let nm_tag = String::from("NM:i:") + &*edit_dist.to_string();
 
         Ok(PafRecord {
