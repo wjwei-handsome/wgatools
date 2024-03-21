@@ -643,7 +643,7 @@ fn gen_two_scroll_one_input_one_msg_area(f: &mut Frame) -> Rc<[Rect]> {
 fn gen_fill_scroll(
     f: &mut Frame,
     area: Rect,
-    cddt: &Vec<String>,
+    cddt: &[String],
     idx: usize,
     select_bg_col: Color,
     title: &str,

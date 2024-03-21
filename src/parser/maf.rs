@@ -221,7 +221,7 @@ impl MAFRecord {
         }
     }
 
-    pub fn rename(&mut self, prefixs: &Vec<&str>) -> Result<(), WGAError> {
+    pub fn rename(&mut self, prefixs: &[&str]) -> Result<(), WGAError> {
         // check prefixs length and slines length
         if prefixs.len() != self.slines.len() {
             return Err(WGAError::SLineCountNotMatch);
