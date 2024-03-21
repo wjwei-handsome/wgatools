@@ -11,7 +11,7 @@ use crate::{
         pseudomaf::generate_pesudo_maf,
         rename::rename_maf,
         stat::{stat_maf, stat_paf},
-        trimovp::trim_ovp,
+        // trimovp::trim_ovp,
     },
 };
 use log::{info, warn};
@@ -459,14 +459,14 @@ pub fn wrap_paf_pesudo_maf(
     Ok(())
 }
 
-/// A wrapper for PAF trim overlap
-pub fn wrap_paf_trim_overlap(
-    input: &Option<String>,
-    output: &str,
-    rewrite: bool,
-) -> Result<(), WGAError> {
-    let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
-    let pafrdr = PAFReader::new(reader);
-    trim_ovp(pafrdr, &mut writer)?;
-    Ok(())
-}
+// /// A wrapper for PAF trim overlap
+// pub fn wrap_paf_trim_overlap(
+//     input: &Option<String>,
+//     output: &str,
+//     rewrite: bool,
+// ) -> Result<(), WGAError> {
+//     let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
+//     let pafrdr = PAFReader::new(reader);
+//     trim_ovp(pafrdr, &mut writer)?;
+//     Ok(())
+// }
