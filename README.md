@@ -5,6 +5,7 @@
 
 ## A Rust library and tools for whole genome alignment files
 
+
 ## Install
 
 ```shell
@@ -59,32 +60,9 @@ This can be useful when running on HPCs where it might be difficult to build wga
 
 ## TOOLS
 
-### WHAT HAVE DONE
 
-- [x] PAF file reader
-- [x] MAF file reader
-- [x] Chain file reader
-- [x] CIGAR string parser
-- [x] MAF2PAF
-- [x] MAF2Chain
-- [x] PAF2Chain
-- [x] PAF2Blocks
-- [x] PAF2MAF
-- [x] Chain2MAF
-- [x] Chain2PAF
-- [x] Call Variants from MAF
-- [x] Visualize MAF file in terminal
-- [x] Extract regions from MAF file
-- [x] Build MAF index
-- [x] Statistics of MAF/PAF file
 
-### WHAT WILL DO IN FUTURE
 
-- [ ] SAM converter [really need?]
-- [ ] Local improvement of alignment by re-alignment
-- [ ] MAF -> GAF -> HAL
-- [ ] for BIG MAF, should optimize
-- [ ] split & chop MAF file
 
 
 
@@ -187,8 +165,6 @@ wgatools tview test.maf
 ![example](./example.gif)
 
 Press <kbd>◄</kbd><kbd>►</kbd> to slide left and right.
-
-You can specify the sliding step in the input parameters, the default is 10,
 
 Press <kbd>q</kbd> to exit.
 
@@ -327,6 +303,14 @@ fn main() {
 - use `rayon` to accelerate the speed of conversions
 - use `ratatui` to visualize MAF file in terminal
 - ...
+
+## ROADMAP
+
+- [ ] SAM converter [really need?]
+- [ ] Local improvement of alignment by re-alignment
+- [ ] MAF -> GAF -> HAL
+- [ ] dotplot
+
 
 ## Contributing
 
