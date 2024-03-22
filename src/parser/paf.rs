@@ -125,7 +125,8 @@ impl AlignRecord for PafRecord {
     }
 
     fn target_align_size(&self) -> u64 {
-        self.block_length
+        // self.block_length
+        self.target_end - self.target_start
     }
 
     fn get_stat(&self) -> Result<RecStat, WGAError> {
