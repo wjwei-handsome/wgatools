@@ -1,0 +1,16 @@
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+</head>
+
+<body>
+    <div id="view" style="display: flex; justify-content: space-evenly;"></div>
+    <script>
+        const spec = {"$schema":"https://vega.github.io/schema/vega-lite/v5.json","autosize":{"contains":"padding","type":"pad"},"data":{"values":[{"cigar":"M","query_chro":"A","query_end":25,"query_start":0,"ref_chro":"B","ref_end":25,"ref_start":0},{"cigar":"I","query_chro":"A","query_end":35,"query_start":25,"ref_chro":"B","ref_end":25,"ref_start":25},{"cigar":"M","query_chro":"A","query_end":50,"query_start":35,"ref_chro":"B","ref_end":40,"ref_start":25},{"cigar":"D","query_chro":"A","query_end":50,"query_start":50,"ref_chro":"B","ref_end":60,"ref_start":40},{"cigar":"M","query_chro":"A","query_end":80,"query_start":50,"ref_chro":"B","ref_end":90,"ref_start":60},{"cigar":"I","query_chro":"A","query_end":100,"query_start":80,"ref_chro":"B","ref_end":90,"ref_start":90},{"cigar":"M","query_chro":"A","query_end":130,"query_start":100,"ref_chro":"B","ref_end":120,"ref_start":90},{"cigar":"D","query_chro":"A","query_end":130,"query_start":130,"ref_chro":"B","ref_end":130,"ref_start":120},{"cigar":"M","query_chro":"A","query_end":200,"query_start":130,"ref_chro":"B","ref_end":200,"ref_start":130}]},"encoding":{"color":{"field":"cigar","legend":{"labelFontSize":20,"symbolSize":10,"symbolStrokeWidth":10,"symbolType":"square","title":"Type"},"scale":{"scheme":"category10"},"type":"nominal"},"column":{"field":"ref_chro","title":null},"opacity":{"condition":{"param":"cigartype","value":1},"value":0.2},"row":{"field":"query_chro","header":{"labelAngle":0},"sort":"descending","title":null},"strokeWidth":{"condition":{"param":"cigartype","value":5},"value":2},"tooltip":[{"field":"ref","type":"nominal"},{"field":"query","type":"nominal"},{"field":"cigar","type":"nominal"}],"x":{"field":"ref_start","scale":{"zero":false},"title":null,"type":"quantitative"},"x2":{"field":"ref_end"},"y":{"field":"query_start","scale":{"zero":false},"title":null,"type":"quantitative"},"y2":{"field":"query_end"}},"mark":{"strokeCap":"round","tooltip":true,"type":"rule"},"params":[{"bind":"scales","name":"zoom","select":"interval"},{"bind":"legend","name":"cigartype","select":{"fields":["cigar"],"type":"point"}}],"resolve":{"scale":{"x":"independent","y":"independent"}},"transform":[{"as":"ref","calculate":"datum.ref_chro+':'+toString(datum.ref_start)+'-'+toString(datum.ref_end)"},{"as":"query","calculate":"datum.query_chro+':'+toString(datum.query_start)+'-'+toString(datum.query_end)"}]};
+        vegaEmbed(
+            '#view',
+            spec
+        );
+    </script>
+</body>
