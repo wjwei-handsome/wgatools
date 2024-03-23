@@ -71,7 +71,6 @@ const DOTPLOT_SPEC: &str = r#"
                 "scheme": "blues"
               },
             "legend": {
-                "title": "Type",
                 "labelFontSize": 20,
                 "symbolSize": 10,
                 "symbolStrokeWidth": 10,
