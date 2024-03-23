@@ -1,10 +1,16 @@
 use crate::{
     converter::{chain2maf, chain2paf, maf2chain, maf2paf, maf2sam, paf2chain, paf2maf},
     errors::WGAError,
-    parser::{chain::ChainReader, common::FileFormat, maf::MAFReader, paf::PAFReader},
+    parser::{
+        chain::ChainReader,
+        common::{DotplotMode, DotplotoutFormat, FileFormat},
+        maf::MAFReader,
+        paf::PAFReader,
+    },
     tools::{
         caller::call_var_maf,
         chunk::chunk_maf,
+        dotplot::dotplot,
         filter::{filter_chain, filter_maf, filter_paf, filter_paf_align_pair},
         index::{build_index, MafIndex},
         mafextra::maf_extract_idx,
@@ -485,5 +491,48 @@ pub fn wrap_chunk(
 
     // mafrdr.chunk(&mut writer, chunk_count, chunk_length)?;
     chunk_maf(mafrdr, length, &mut writer)?;
+    Ok(())
+}
+
+/// A wrapper for dotplot sub-cmd
+#[warn(clippy::too_many_arguments)]
+pub fn wrap_dotplot(
+    input: &Option<String>,
+    format: FileFormat,
+    out_format: DotplotoutFormat,
+    mode: DotplotMode,
+    no_identity: bool,
+    cutoff: Option<usize>,
+    output: &str,
+    rewrite: bool,
+) -> Result<(), WGAError> {
+    // prepare reader and writer
+    let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
+    // let mafrdr = MAFReader::new(reader)?;
+    match mode {
+        DotplotMode::BaseLevel => {
+            if no_identity {
+                warn!("`no_identity` is set, but it's not supported in `BaseLevel` mode");
+            }
+        }
+        DotplotMode::Overview => {
+            if cutoff.is_some() {
+                warn!("`cutoff` is set, but it's not supported in `Overview` mode");
+            }
+        }
+    }
+
+    // set default cutoff to 50
+    let cutoff = cutoff.unwrap_or(50);
+
+    dotplot(
+        reader,
+        &mut writer,
+        format,
+        out_format,
+        mode,
+        no_identity,
+        cutoff,
+    )?;
     Ok(())
 }
