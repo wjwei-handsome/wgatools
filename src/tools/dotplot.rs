@@ -1,54 +1,360 @@
-// use base64::{engine::general_purpose, Engine as _};
-// use std::io::prelude::*;
+use crate::{
+    errors::WGAError,
+    parser::{
+        cigar::{parse_cigar_to_base_plotdata, parse_maf_to_base_plotdata},
+        common::{AlignRecord, DotplotMode, DotplotoutFormat, FileFormat, Strand},
+        maf::MAFReader,
+        paf::PAFReader,
+    },
+};
+use minijinja::{context, Environment};
+use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::io::{BufRead, Read, Write};
 
-use crate::parser::paf::PAFReader;
+const DOTPLOT_SPEC: &str = r#"
+{
+    "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+    "autosize": {
+        "type": "pad",
+        "contains": "padding"
+    },
+    "data": {
+        "values": []
+    },
+    "params": [
+        {
+        "name": "zoom",
+        "select": "interval",
+        "bind": "scales"
+        },
+        {
+        "name": "cigartype",
+        "select": {"type": "point", "fields": ["cigar"]},
+        "bind": "legend"
+        }
+    ],
+    "mark": {
+        "type": "rule",
+        "tooltip": true,
+        "strokeCap": "round"
+    },
+    "transform": [{
+        "calculate": "datum.ref_chro+':'+toString(datum.ref_start)+'-'+toString(datum.ref_end)",
+        "as": "ref"
+    }, {
+        "calculate": "datum.query_chro+':'+toString(datum.query_start)+'-'+toString(datum.query_end)",
+        "as": "query"
+    }],
+    "encoding": {
+        "x": {
+            "field": "ref_start",
+            "type": "quantitative",
+            "title":null
+        },
+        "y": {
+            "field": "query_start",
+            "type": "quantitative",
+            "title":null
+        },
+        "x2": {
+            "field": "ref_end"
+        },
+        "y2": {
+            "field": "query_end"
+        },
+        "color": {
+            "field": "identity",
+            "type": "quantitative",
+            "scale": {
+                "scheme": "blues"
+              },
+            "legend": {
+                "title": "Type",
+                "labelFontSize": 20,
+                "symbolSize": 10,
+                "symbolStrokeWidth": 10,
+                "symbolType": "square"
+              }
+        },
+        "tooltip": [{
+            "field": "ref",
+            "type": "nominal"
+        }, {
+            "field": "query",
+            "type": "nominal"
+        }, {
+            "field": "identity",
+            "type": "nominal"
+        }],
+        "column": {
+            "field": "ref_chro",
+            "title": null
+        },
+        "row": {
+            "field": "query_chro",
+            "header": {
+                "labelAngle": 0
+            },
+            "sort": "descending",
+            "title": null
+        },
+        "opacity": {
+            "condition": {"param": "cigartype", "value": 1},
+            "value": 0.2
+          },
+        "strokeWidth": {
+            "condition": {"param": "cigartype", "value": 5},
+            "value": 2
+        }
+    },
+    "resolve": {"scale": {"x": "independent", "y": "independent"}}
+}"#;
 
-pub fn chart() {
-    let path = "bzg.paf";
-    let mut pafreader = PAFReader::from_path(path).unwrap();
-    for rec in pafreader.records() {
-        let rec = rec.unwrap();
-        println!("{:?}", rec);
-    }
+const VEGA_TEMP: &str = r#"<head>
+    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+</head>
+
+<body>
+    <div id="view" style="display: flex; justify-content: space-evenly;"></div>
+    <script>
+        const spec = {{ vl_json | safe }};
+        vegaEmbed(
+            '#view',
+            spec
+        );
+    </script>
+</body>
+"#;
+
+#[derive(Debug, Deserialize, Serialize)]
+struct AllPlotdata {
+    ref_start: u64,
+    ref_end: u64,
+    query_start: u64,
+    query_end: u64,
+    identity: f64,
+    ref_chro: String,
+    query_chro: String,
 }
 
-// pub fn chart() {
-//     let schema = r#"
-//     {
-//         "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
-//         "data": {
-//           "values": [
-//             {"x": 0, "y": 0, "color": 10},
-//             {"x": 10, "y": 15, "color": 10},
-//             {"x": 10, "y": null, "color": 10},
-//             {"x": 12, "y": 27, "color": 20},
-//             {"x": 18, "y": 18, "color": 20},
-//             {"x": 18, "y": null, "color": 20},
-//             {"x": 20, "y": 30, "color": 30},
-//             {"x": 40, "y": 60, "color": 30},
-//             {"x": 40, "y": null, "color": 30}
-//           ]
-//         },
-//         "mark": "line",
-//         "encoding": {
-//           "x": {
-//             "field": "x",
-//             "type": "quantitative",
-//             "axis": {
-//               "values": [20, 40],
-//               "labelExpr": "{20: 'chrA', 40: 'chrb'}[datum.value]"
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BasePlotdata {
+    pub ref_start: u64,
+    pub ref_end: u64,
+    pub query_start: u64,
+    pub query_end: u64,
+    pub cigar: char,
+    pub ref_chro: String,
+    pub query_chro: String,
+}
 
-//             }
-//           },
-//           "y": {"field": "y", "type": "quantitative", "axis": {"values": [30, 60]}},
-//           "color": {"field": "color", "type": "quantitative"}
-//         }
-//       }
-//     "#;
-//     let code = general_purpose::STANDARD.encode(schema);
-//     let get_url = format!("https://kroki.io/vegalite/svg/{}", code);
-//     let res = reqwest::blocking::get(get_url).unwrap().text().unwrap();
-//     let stdout = std::io::stdout();
-//     let mut handle = stdout.lock();
-//     handle.write_all(res.as_bytes()).unwrap();
-// }
+pub fn dotplot(
+    reader: Box<dyn BufRead + Send>,
+    writer: &mut dyn Write,
+    format: FileFormat,
+    out_format: DotplotoutFormat,
+    mode: DotplotMode,
+    no_identity: bool,
+    skip_cutoff: usize,
+) -> Result<(), WGAError> {
+    // init vega spec
+    let mut vega_spec: Value = serde_json::from_str(DOTPLOT_SPEC)?;
+
+    // match mode to generate data
+    match mode {
+        DotplotMode::Overview => {
+            let pair_stat_vec = match format {
+                FileFormat::Maf => generate_maf_data(MAFReader::new(reader)?, no_identity)?,
+                FileFormat::Paf => generate_paf_data(PAFReader::new(reader), no_identity)?,
+                _ => {
+                    return Err(WGAError::Other(anyhow::anyhow!(
+                        "Only support MAF and PAF format"
+                    )));
+                }
+            };
+            render_output(pair_stat_vec, writer, out_format, vega_spec)?;
+        }
+        DotplotMode::BaseLevel => {
+            let pair_base_plot_vec = match format {
+                FileFormat::Maf => generate_maf_basedata(MAFReader::new(reader)?, skip_cutoff)?,
+                FileFormat::Paf => generate_paf_basedata(PAFReader::new(reader), skip_cutoff)?,
+                _ => {
+                    return Err(WGAError::Other(anyhow::anyhow!(
+                        "Only support MAF and PAF format"
+                    )));
+                }
+            };
+            let final_base_plotdata = pair_base_plot_vec
+                .into_par_iter()
+                .flatten()
+                .collect::<Vec<_>>();
+
+            // change the vega spec
+            vega_spec["encoding"]["x"]["scale"]["zero"] = false.into();
+            vega_spec["encoding"]["y"]["scale"]["zero"] = false.into();
+            vega_spec["encoding"]["color"]["scale"]["scheme"] = "category10".into();
+            vega_spec["encoding"]["color"]["field"] = "cigar".into();
+            vega_spec["encoding"]["color"]["type"] = "nominal".into();
+            vega_spec["encoding"]["tooltip"][2]["field"] = "cigar".into();
+
+            render_output(final_base_plotdata, writer, out_format, vega_spec)?;
+        }
+    }
+    Ok(())
+}
+
+/// render data output
+fn render_output<S: Serialize>(
+    data: Vec<S>,
+    writer: &mut dyn Write,
+    format: DotplotoutFormat,
+    mut vega_spec: Value,
+) -> Result<(), WGAError> {
+    match format {
+        DotplotoutFormat::Json => {
+            vega_spec["data"]["values"] = serde_json::to_value(&data)?;
+            writeln!(writer, "{}", vega_spec)?;
+        }
+        DotplotoutFormat::Html => {
+            let mut env = Environment::new();
+            env.add_template("vega", VEGA_TEMP)?;
+            let template = env.get_template("vega")?;
+            vega_spec["data"]["values"] = serde_json::to_value(&data)?;
+            let vl_json = serde_json::to_string(&vega_spec)?;
+            let rendered = template.render(context! { vl_json => vl_json })?;
+            writeln!(writer, "{}", rendered)?;
+        }
+        DotplotoutFormat::Csv => {
+            let mut wtr = csv::Writer::from_writer(writer);
+            for record in data {
+                wtr.serialize(record)?;
+            }
+            wtr.flush()?;
+        }
+    }
+    Ok(())
+}
+
+/// Generate Plotdatas from MAF records
+fn generate_maf_data<R: Read + Send>(
+    mut reader: MAFReader<R>,
+    no_identity: bool,
+) -> Result<Vec<AllPlotdata>, WGAError> {
+    let pair_stat_vec = reader
+        .records()
+        .par_bridge()
+        .try_fold(Vec::new, |mut acc, rec| {
+            acc.push(rec_dot_data(&rec?, no_identity)?);
+            Ok::<Vec<AllPlotdata>, WGAError>(acc)
+        })
+        .try_reduce(Vec::new, |mut acc, mut vec| {
+            acc.append(&mut vec);
+            Ok(acc)
+        })?;
+    Ok(pair_stat_vec)
+}
+
+/// Generate Plotdatas from PAF records
+fn generate_paf_data<R: Read + Send>(
+    mut reader: PAFReader<R>,
+    no_identity: bool,
+) -> Result<Vec<AllPlotdata>, WGAError> {
+    let pair_stat_vec = reader
+        .records()
+        .par_bridge()
+        .try_fold(Vec::new, |mut acc, rec| {
+            acc.push(rec_dot_data(&rec?, no_identity)?);
+            Ok::<Vec<AllPlotdata>, WGAError>(acc)
+        })
+        .try_reduce(Vec::new, |mut acc, mut vec| {
+            acc.append(&mut vec);
+            Ok(acc)
+        })?;
+    Ok(pair_stat_vec)
+}
+
+/// Generate BasePlotdatas from PAF records
+fn generate_paf_basedata<R: Read + Send>(
+    mut reader: PAFReader<R>,
+    cutoff: usize,
+) -> Result<Vec<Vec<BasePlotdata>>, WGAError> {
+    let pair_stat_vec = reader
+        .records()
+        .par_bridge()
+        .try_fold(Vec::new, |mut acc, rec| {
+            acc.push(parse_cigar_to_base_plotdata(&rec?, cutoff)?);
+            Ok::<Vec<Vec<BasePlotdata>>, WGAError>(acc)
+        })
+        .try_reduce(Vec::new, |mut acc, mut vec| {
+            // join the nested vec
+            acc.append(&mut vec);
+            Ok(acc)
+        })?;
+    Ok(pair_stat_vec)
+}
+
+/// Generate BasePlotdatas from MAF records
+fn generate_maf_basedata<R: Read + Send>(
+    mut reader: MAFReader<R>,
+    cutoff: usize,
+) -> Result<Vec<Vec<BasePlotdata>>, WGAError> {
+    let pair_stat_vec = reader
+        .records()
+        .par_bridge()
+        .try_fold(Vec::new, |mut acc, rec| {
+            acc.push(parse_maf_to_base_plotdata(&rec?, cutoff)?);
+            Ok::<Vec<Vec<BasePlotdata>>, WGAError>(acc)
+        })
+        .try_reduce(Vec::new, |mut acc, mut vec| {
+            // join the nested vec
+            acc.append(&mut vec);
+            Ok(acc)
+        })?;
+    Ok(pair_stat_vec)
+}
+
+// stat a record to generate a Plotdata
+fn rec_dot_data<T: AlignRecord>(rec: &T, no_identity: bool) -> Result<AllPlotdata, WGAError> {
+    // get pair
+    let ref_start = rec.target_start();
+    let mut query_start = rec.query_start();
+    let ref_end = rec.target_end();
+    let mut query_end = rec.query_end();
+    let identity = if no_identity {
+        1.0
+    } else {
+        calculate_identity(rec)?
+    };
+    let ref_chro = rec.target_name().to_string();
+    let query_chro = rec.query_name().to_string();
+    let strand = rec.query_strand();
+    match strand {
+        Strand::Positive => {}
+        Strand::Negative => {
+            // reverse the query start and end
+            std::mem::swap(&mut query_start, &mut query_end);
+        }
+    }
+    Ok(AllPlotdata {
+        ref_start,
+        ref_end,
+        query_start,
+        query_end,
+        identity,
+        ref_chro,
+        query_chro,
+    })
+}
+
+// calculate identity for a record
+fn calculate_identity<T: AlignRecord>(rec: &T) -> Result<f64, WGAError> {
+    let aligned_size = rec.target_align_size();
+    let rec_stat = rec.get_stat()?;
+    let matched = rec_stat.matched;
+    let identity = matched as f64 / aligned_size as f64;
+    Ok(identity)
+}
