@@ -76,6 +76,8 @@ pub enum WGAError {
     NotImplemented,
     #[error("S-line count not match")]
     SLineCountNotMatch,
+    #[error("Jinja2 Error: {0}, please contact the author")]
+    Jinja2Error(#[from] minijinja::Error),
     // Other error
     #[error(transparent)]
     Other(#[from] anyhow::Error),
