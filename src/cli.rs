@@ -1,4 +1,4 @@
-use crate::parser::common::FileFormat;
+use crate::parser::common::{DotplotMode, DotplotoutFormat, FileFormat};
 use clap::ArgAction;
 use clap::{command, Parser, Subcommand};
 
@@ -109,6 +109,16 @@ pub enum Commands {
         #[arg(required = false, long, short)]
         file: Option<String>,
     },
+    /// Chunk MAF file by length
+    #[command(visible_alias = "ch", name = "chunk")]
+    Chunk {
+        /// Input MAF File, None for STDIN
+        #[arg(required = false)]
+        input: Option<String>,
+        /// Chunk by length
+        #[arg(required = true, long, short = 'l')]
+        length: u64,
+    },
     /// Call Variants from MAF file
     #[command(visible_alias = "c", name = "call")]
     Call {
@@ -153,9 +163,28 @@ pub enum Commands {
         #[arg(required = false, long, short, default_value = "false")]
         each: bool,
     },
-    /// TEST: Plot dotplot for Alignment file
+    /// Plot dotplot for Alignment file
     #[command(visible_alias = "dp", name = "dotplot")]
-    Dotplot {},
+    Dotplot {
+        /// Input Alignment File, None for STDIN
+        #[arg(required = false)]
+        input: Option<String>,
+        /// Input File format,
+        #[arg(required = false, long, short, default_value = "maf")]
+        format: FileFormat,
+        /// Output format
+        #[arg(required = false, long, default_value = "html")]
+        out_format: DotplotoutFormat,
+        /// Plot mode, BaseLevel or Overview
+        #[arg(required = false, long, short, default_value = "base-level")]
+        mode: DotplotMode,
+        /// do not show identity in Overview mode, default: false
+        #[arg(required = false, long, short = 'd', default_value = "false")]
+        no_identity: bool,
+        /// Skip segment with length less than cutoff in BaseLevel mode, default: 0
+        #[arg(required = false, long, short = 'l')]
+        length: Option<usize>,
+    },
     /// Filter records for Alignment file
     #[command(visible_alias = "fl", name = "filter")]
     Filter {
@@ -219,16 +248,6 @@ pub enum Commands {
     //     #[arg(required = false)]
     //     input: Option<String>,
     // },
-    /// Chunk MAF file by length
-    #[command(visible_alias = "ch", name = "chunk")]
-    Chunk {
-        /// Input MAF File, None for STDIN
-        #[arg(required = false)]
-        input: Option<String>,
-        /// Chunk by length
-        #[arg(required = true, long, short = 'l')]
-        length: u64,
-    },
 }
 
 pub fn make_cli_parse() -> Cli {
