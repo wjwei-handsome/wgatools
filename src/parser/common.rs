@@ -185,3 +185,16 @@ pub fn recount_align_size(seq: &str) -> u64 {
     }
     align_size
 }
+
+#[derive(Debug, ValueEnum, Clone, Copy)]
+pub enum DotplotMode {
+    BaseLevel,
+    Overview,
+}
+
+#[derive(Debug, ValueEnum, Clone, Copy)]
+pub enum DotplotoutFormat {
+    Html,
+    Json,
+    Csv,
+}
