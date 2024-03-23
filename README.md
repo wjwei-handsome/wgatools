@@ -139,6 +139,40 @@ cat test.maf | wgatools maf2paf | wgatools paf2maf -g target.fa -q query.fa > te
 wgatools paf2chain test.paf | wgatools chain2maf -g target.fa -q query.fa | wgatools maf2chain | wgatools chain2paf > funny.paf
 ```
 
+### Dotplot for MAF/PAF file
+
+We provide two modes for plot, for example:
+
+- BaseLevel
+
+![base](https://raw.githubusercontent.com/wjwei-handsome/wwjPic/main/img/20240324025520.png)
+
+This mode can catch the alignment details in each record, such as matches, insertions and deletions. This can help us to better observe the local alignment.
+
+```shell
+wgatools dotplot -f paf test/testdotplot.paf > out.html
+```
+
+In Interactive html, you can click on the legend to view only the types of interest, for example:
+
+![base2](https://raw.githubusercontent.com/wjwei-handsome/wwjPic/main/img/20240324025906.png)
+
+>NOTE: For better interactivity, the `zoom` function is turned on. However, if there is too much data, the effect may be limited by your browser performance.
+
+This [simple example](https://github.com/wjwei-handsome/wgatools/blob/master/test/test.html) can be found in the [test](https://github.com/wjwei-handsome/wgatools/tree/master/test) directory.
+
+- Overview
+
+![overview](https://raw.githubusercontent.com/wjwei-handsome/wwjPic/main/img/20240324025107.png)
+
+Similar to common dotplot scripts, it will draw each align record and color it according to identity.
+
+```shell
+wgatools dotplot test.maf -m overview > overview.html
+```
+
+😎 For [`vega`](https://vega.github.io) and DIY hackers, we also provide output in json(vega schema) and csv formats.
+
 ### Extract regions from MAF file
 
 The line of MAF file is so long that it's hard to read. You can use `maf-ext` to extract specific region from MAF file with index:
