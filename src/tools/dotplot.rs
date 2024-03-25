@@ -16,10 +16,8 @@ use std::io::{BufRead, Read, Write};
 const DOTPLOT_SPEC: &str = r#"
 {
     "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
-    "autosize": {
-        "type": "pad",
-        "contains": "padding"
-    },
+    "height": 800,
+    "width": 800,
     "data": {
         "values": []
     },
