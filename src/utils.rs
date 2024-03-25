@@ -495,7 +495,7 @@ pub fn wrap_chunk(
 }
 
 /// A wrapper for dotplot sub-cmd
-#[warn(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 pub fn wrap_dotplot(
     input: &Option<String>,
     format: FileFormat,
