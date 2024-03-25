@@ -690,6 +690,84 @@ pub fn gen_pesudo_maf_by_cigar(
     Ok(())
 }
 
+/// exchange query_end and query_start if negative strand
+fn reserve_query_start_end(negative: bool, plot_data: &mut BasePlotdata) {
+    if negative {
+        std::mem::swap(&mut plot_data.query_start, &mut plot_data.query_end);
+    }
+}
+
+/// emit BasePlotdata into vec
+fn emit_baseplotdatas<T: AlignRecord>(
+    ref_current_offset: &mut u64,
+    query_current_offset: &mut u64,
+    rec: &T,
+    cigar: char,
+    length: usize,
+    skip_cutoff: usize,
+    base_plotdata_vec: &mut Vec<BasePlotdata>,
+) {
+    let negative = match rec.query_strand() {
+        crate::parser::common::Strand::Positive => false,
+        crate::parser::common::Strand::Negative => true,
+    };
+    let ref_chro = rec.target_name();
+    let query_chro = rec.query_name();
+    match cigar {
+        'M' | '=' | 'X' => {
+            // bc of wfmash, like some 1= 2=, we need to skip them
+            if length >= 5 && length > skip_cutoff {
+                let mut base_plotdata = BasePlotdata {
+                    ref_start: *ref_current_offset,
+                    ref_end: *ref_current_offset + length as u64,
+                    query_start: *query_current_offset,
+                    query_end: *query_current_offset + length as u64,
+                    cigar: 'M',
+                    ref_chro: ref_chro.to_string(),
+                    query_chro: query_chro.to_string(),
+                };
+                reserve_query_start_end(negative, &mut base_plotdata);
+                base_plotdata_vec.push(base_plotdata);
+            }
+            *ref_current_offset += length as u64;
+            *query_current_offset += length as u64;
+        }
+        'I' => {
+            if length > skip_cutoff {
+                let mut base_plotdata = BasePlotdata {
+                    ref_start: *ref_current_offset,
+                    ref_end: *ref_current_offset,
+                    query_start: *query_current_offset,
+                    query_end: *query_current_offset + length as u64,
+                    cigar,
+                    ref_chro: ref_chro.to_string(),
+                    query_chro: query_chro.to_string(),
+                };
+                reserve_query_start_end(negative, &mut base_plotdata);
+                base_plotdata_vec.push(base_plotdata);
+            }
+            *query_current_offset += length as u64;
+        }
+        'D' => {
+            if length > skip_cutoff {
+                let mut base_plotdata = BasePlotdata {
+                    ref_start: *ref_current_offset,
+                    ref_end: *ref_current_offset + length as u64,
+                    query_start: *query_current_offset,
+                    query_end: *query_current_offset,
+                    cigar,
+                    ref_chro: ref_chro.to_string(),
+                    query_chro: query_chro.to_string(),
+                };
+                reserve_query_start_end(negative, &mut base_plotdata);
+                base_plotdata_vec.push(base_plotdata);
+            }
+            *ref_current_offset += length as u64;
+        }
+        _ => {}
+    };
+}
+
 /// generate BasePlotdatas from cigar
 pub fn parse_cigar_to_base_plotdata<T: AlignRecord>(
     rec: &T,
@@ -708,57 +786,15 @@ pub fn parse_cigar_to_base_plotdata<T: AlignRecord>(
         |res: Result<(), WGAError>, cigarunit| {
             if res.is_ok() {
                 let cigarunit = cst2cu(cigarunit)?;
-                let length = cigarunit.len as usize;
-                match cigarunit.op {
-                    'M' | '=' | 'X' => {
-                        // bc of wfmash, like some 1= 2=, we need to skip them
-                        if length >= 5 && length > skip_cutoff {
-                            let base_plotdata = BasePlotdata {
-                                ref_start: ref_current_offset,
-                                ref_end: ref_current_offset + length as u64,
-                                query_start: query_current_offset,
-                                query_end: query_current_offset + length as u64,
-                                cigar: 'M',
-                                ref_chro: rec.target_name().to_string(),
-                                query_chro: rec.query_name().to_string(),
-                            };
-                            base_plotdata_vec.push(base_plotdata);
-                        }
-                        ref_current_offset += length as u64;
-                        query_current_offset += length as u64;
-                    }
-                    'I' => {
-                        if length > skip_cutoff {
-                            let base_plotdata = BasePlotdata {
-                                ref_start: ref_current_offset,
-                                ref_end: ref_current_offset,
-                                query_start: query_current_offset,
-                                query_end: query_current_offset + length as u64,
-                                cigar: 'I',
-                                ref_chro: rec.target_name().to_string(),
-                                query_chro: rec.query_name().to_string(),
-                            };
-                            base_plotdata_vec.push(base_plotdata);
-                        }
-                        query_current_offset += length as u64;
-                    }
-                    'D' => {
-                        if length > skip_cutoff {
-                            let base_plotdata = BasePlotdata {
-                                ref_start: ref_current_offset,
-                                ref_end: ref_current_offset + length as u64,
-                                query_start: query_current_offset,
-                                query_end: query_current_offset,
-                                cigar: 'D',
-                                ref_chro: rec.target_name().to_string(),
-                                query_chro: rec.query_name().to_string(),
-                            };
-                            base_plotdata_vec.push(base_plotdata);
-                        }
-                        ref_current_offset += length as u64;
-                    }
-                    _ => {}
-                };
+                emit_baseplotdatas(
+                    &mut ref_current_offset,
+                    &mut query_current_offset,
+                    rec,
+                    cigarunit.op,
+                    cigarunit.len as usize,
+                    skip_cutoff,
+                    &mut base_plotdata_vec,
+                );
             }
             res
         },
@@ -784,56 +820,15 @@ pub fn parse_maf_to_base_plotdata<T: AlignRecord>(
         .group_by(|(c1, c2)| cigar_cat_ext(c1, c2));
     for (k, g) in group_by_iter.into_iter() {
         let length = g.count();
-        match k {
-            '=' | 'X' => {
-                // bc of wfmash, like some 1= 2=, we need to skip them
-                if length >= 5 && length > skip_cutoff {
-                    let base_plotdata = BasePlotdata {
-                        ref_start: ref_current_offset,
-                        ref_end: ref_current_offset + length as u64,
-                        query_start: query_current_offset,
-                        query_end: query_current_offset + length as u64,
-                        cigar: 'M',
-                        ref_chro: rec.target_name().to_string(),
-                        query_chro: rec.query_name().to_string(),
-                    };
-                    base_plotdata_vec.push(base_plotdata);
-                }
-                ref_current_offset += length as u64;
-                query_current_offset += length as u64;
-            }
-            'I' => {
-                if length > skip_cutoff {
-                    let base_plotdata = BasePlotdata {
-                        ref_start: ref_current_offset,
-                        ref_end: ref_current_offset,
-                        query_start: query_current_offset,
-                        query_end: query_current_offset + length as u64,
-                        cigar: 'I',
-                        ref_chro: rec.target_name().to_string(),
-                        query_chro: rec.query_name().to_string(),
-                    };
-                    base_plotdata_vec.push(base_plotdata);
-                }
-                query_current_offset += length as u64;
-            }
-            'D' => {
-                if length > skip_cutoff {
-                    let base_plotdata = BasePlotdata {
-                        ref_start: ref_current_offset,
-                        ref_end: ref_current_offset + length as u64,
-                        query_start: query_current_offset,
-                        query_end: query_current_offset,
-                        cigar: 'D',
-                        ref_chro: rec.target_name().to_string(),
-                        query_chro: rec.query_name().to_string(),
-                    };
-                    base_plotdata_vec.push(base_plotdata);
-                }
-                ref_current_offset += length as u64;
-            }
-            _ => {}
-        };
+        emit_baseplotdatas(
+            &mut ref_current_offset,
+            &mut query_current_offset,
+            rec,
+            k,
+            length,
+            skip_cutoff,
+            &mut base_plotdata_vec,
+        );
     }
     Ok(base_plotdata_vec)
 }
