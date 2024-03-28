@@ -9,6 +9,7 @@ use itertools::enumerate;
 use ratatui::{prelude::*, widgets::*};
 use regex::Regex;
 use rust_lapper::{Interval, Lapper};
+use std::path::PathBuf;
 use std::{
     fs::File,
     io::{self, BufReader, Read, Seek},
@@ -206,7 +207,11 @@ impl MafViewApp<'_, File> {
         let mut scroll = Scroll::default();
         let mut fixed = vec![Line::from("pos:"), Line::from("|")];
         // read index
-        let index_file = File::open(format!("{}.index", input))?;
+        let index_file_path = &format!("{}.index", input);
+        let index_file = match File::open(index_file_path) {
+            Ok(index_file) => index_file,
+            Err(_) => return Err(WGAError::FileNotExist(PathBuf::from(index_file_path))),
+        };
         let mafindex: MafIndex = serde_json::from_reader(BufReader::new(index_file))?;
         // create navigation
         let mut navigation = Self::gen_navigation(mafindex);
