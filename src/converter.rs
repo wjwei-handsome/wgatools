@@ -59,7 +59,7 @@ pub fn maf2chain<R: Read + Send>(
         let record = record?;
 
         // transform record to Chain Header
-        let mut header = ChainHeader::from(&record);
+        let mut header = ChainHeader::try_from(&record)?;
 
         // set chain id
         header.chain_id = id;
@@ -140,7 +140,7 @@ pub fn paf2chain<R: Read + Send>(
         let record = record?;
 
         // transform record to Chain Header
-        let mut header = ChainHeader::from(&record);
+        let mut header = ChainHeader::try_from(&record)?;
 
         // set chain id
         header.chain_id = id;
