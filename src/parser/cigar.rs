@@ -151,6 +151,99 @@ pub fn parse_cigar_to_blocks<T: AlignRecord>(
     res
 }
 
+/// Parse maf seq to get indel count in head and tail
+pub fn parse_maf_seq_to_trim<T: AlignRecord>(rec: &T) -> Result<(u64, u64, u64, u64), WGAError> {
+    let mut head_ins = 0;
+    let mut head_del = 0;
+    let mut tail_ins = 0;
+    let mut tail_del = 0;
+
+    let mut head_indel = true;
+
+    let seq1_iter = rec.target_seq().chars();
+    let seq2_iter = rec.query_seq().chars();
+
+    let group_by_iter = seq1_iter
+        .zip(seq2_iter)
+        .group_by(|(c1, c2)| cigar_cat_ext(c1, c2));
+    for (k, g) in group_by_iter.into_iter() {
+        let count = g.count();
+        match k {
+            'M' | 'X' | '=' => {
+                tail_ins = 0;
+                tail_del = 0;
+                head_indel = false;
+            }
+            'I' => {
+                if head_indel {
+                    head_ins += count;
+                }
+                tail_ins = count;
+            }
+            'D' => {
+                if head_indel {
+                    head_del += count;
+                }
+                tail_del = count;
+            }
+            _ => return Err(WGAError::CigarOpInvalid(k.to_string())),
+        }
+    }
+
+    Ok((
+        head_ins as u64,
+        head_del as u64,
+        tail_ins as u64,
+        tail_del as u64,
+    ))
+}
+
+/// Parse cigar string to get indel count in head and tail
+pub fn parse_cigar_to_trim<T: AlignRecord>(rec: &T) -> Result<(u64, u64, u64, u64), WGAError> {
+    let mut head_ins = 0;
+    let mut head_del = 0;
+    let mut tail_ins = 0;
+    let mut tail_del = 0;
+
+    let mut head_indel = true;
+
+    let cigar = rec.get_cigar_str()?;
+    let (cigar, _tag) = tag("cg:Z:")(cigar)?;
+
+    let (_, _) = fold_many1(
+        parse_cigar_str_tuple,
+        null,
+        |res: Result<(), WGAError>, cigarunit| {
+            if res.is_ok() {
+                let cigarunit = cst2cu(cigarunit)?;
+                match cigarunit.op {
+                    'M' | '=' | 'X' => {
+                        tail_ins = 0;
+                        tail_del = 0;
+                        head_indel = false;
+                    }
+                    'I' => {
+                        if head_indel {
+                            head_ins += cigarunit.len;
+                        }
+                        tail_ins = cigarunit.len;
+                    }
+                    'D' => {
+                        if head_indel {
+                            head_del += cigarunit.len;
+                        }
+                        tail_del = cigarunit.len;
+                    }
+                    _ => return Err(WGAError::CigarOpInvalid(cigarunit.op.to_string())), // TODO: handle 'H' for SAM
+                };
+            }
+            res
+        },
+    )(cigar)?;
+
+    Ok((head_ins, head_del, tail_ins, tail_del))
+}
+
 /// Parse cigar string of a AlignRecord[PafRecord, SamRecord] which includes cg:Z: tag and
 /// write into a chain file.
 /// - For PafRecord: cigar should only contains 'M,I,D'
