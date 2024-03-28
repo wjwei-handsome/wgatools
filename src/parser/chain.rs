@@ -1,5 +1,5 @@
 use crate::errors::{ParseChainErrKind, WGAError};
-use crate::parser::cigar::parse_chain_to_cigar;
+use crate::parser::cigar::{parse_chain_to_cigar, parse_cigar_to_trim, parse_maf_seq_to_trim};
 use crate::parser::common::{AlignRecord, SeqInfo, Strand};
 use crate::parser::maf::MAFRecord;
 use crate::parser::paf::PafRecord;
@@ -99,33 +99,13 @@ impl fmt::Display for ChainDataLine {
     }
 }
 
-impl From<&PafRecord> for ChainHeader {
-    fn from(value: &PafRecord) -> Self {
-        ChainHeader {
-            score: value.mapq as f64,
-            target: SeqInfo {
-                name: value.target_name.clone(),
-                size: value.target_length,
-                strand: Strand::Positive,
-                start: value.target_start,
-                end: value.target_end,
-            },
-            query: SeqInfo {
-                name: value.query_name.clone(),
-                size: value.query_length,
-                strand: value.query_strand(),
-                start: value.query_start,
-                end: value.query_end,
-            },
-            chain_id: 0,
-        }
-    }
-}
+// we can't use T, refto: https://github.com/rust-lang/rust/issues/50238
+impl TryFrom<&MAFRecord> for ChainHeader {
+    type Error = WGAError;
 
-impl From<&MAFRecord> for ChainHeader {
-    fn from(value: &MAFRecord) -> Self {
-        ChainHeader {
-            score: 255.0,
+    fn try_from(value: &MAFRecord) -> Result<Self, Self::Error> {
+        let mut header = ChainHeader {
+            score: 255_f64,
             target: SeqInfo {
                 name: value.target_name().to_owned(),
                 size: value.target_length(),
@@ -141,7 +121,64 @@ impl From<&MAFRecord> for ChainHeader {
                 end: value.query_end(),
             },
             chain_id: 0,
+        };
+        let (head_ins, head_del, tail_ins, tail_del) = parse_maf_seq_to_trim(value)?;
+        match value.query_strand() {
+            Strand::Positive => {
+                header.query.start += head_ins;
+                header.target.start += head_del;
+                header.query.end -= tail_ins;
+                header.target.end -= tail_del;
+            }
+            Strand::Negative => {
+                header.target.start += head_del;
+                header.target.end -= tail_del;
+                header.query.start = header.query.size - (header.query.end - head_ins);
+                header.query.end = header.query.size - (header.query.start + tail_ins);
+            }
         }
+        Ok(header)
+    }
+}
+
+impl TryFrom<&PafRecord> for ChainHeader {
+    type Error = WGAError;
+
+    fn try_from(value: &PafRecord) -> Result<Self, Self::Error> {
+        let mut header = ChainHeader {
+            score: 255_f64,
+            target: SeqInfo {
+                name: value.target_name.clone(),
+                size: value.target_length,
+                strand: Strand::Positive,
+                start: value.target_start,
+                end: value.target_end,
+            },
+            query: SeqInfo {
+                name: value.query_name.clone(),
+                size: value.query_length,
+                strand: value.query_strand(),
+                start: value.query_start,
+                end: value.query_end,
+            },
+            chain_id: 0,
+        };
+        let (head_ins, head_del, tail_ins, tail_del) = parse_cigar_to_trim(value)?;
+        match value.query_strand() {
+            Strand::Positive => {
+                header.query.start += head_ins;
+                header.target.start += head_del;
+                header.query.end -= tail_ins;
+                header.target.end -= tail_del;
+            }
+            Strand::Negative => {
+                header.target.start += head_del;
+                header.target.end -= tail_del;
+                header.query.start = header.query.size - (header.query.end - head_ins);
+                header.query.end = header.query.size - (header.query.start + tail_ins);
+            }
+        }
+        Ok(header)
     }
 }
 
