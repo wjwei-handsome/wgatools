@@ -153,6 +153,8 @@ This mode can catch the alignment details in each record, such as matches, inser
 wgatools dotplot -f paf test/testdotplot.paf > out.html
 ```
 
+By default, INDELs smaller than `50bp` are merged with adjacent match. You can also use the parameter `-l, --length` to specify the threshold.
+
 In Interactive html, you can click on the legend to view only the types of interest, for example:
 
 ![base2](https://raw.githubusercontent.com/wjwei-handsome/wwjPic/main/img/20240324025906.png)
