@@ -791,6 +791,7 @@ fn reserve_query_start_end(negative: bool, plot_data: &mut BasePlotdata) {
 }
 
 /// emit BasePlotdata into vec
+#[allow(clippy::too_many_arguments)]
 fn emit_baseplotdatas<T: AlignRecord>(
     ref_current_offset: &mut u64,
     query_current_offset: &mut u64,
@@ -799,6 +800,7 @@ fn emit_baseplotdatas<T: AlignRecord>(
     length: usize,
     skip_cutoff: usize,
     base_plotdata_vec: &mut Vec<BasePlotdata>,
+    last_m: &mut bool,
 ) {
     let negative = match rec.query_strand() {
         crate::parser::common::Strand::Positive => false,
@@ -808,53 +810,83 @@ fn emit_baseplotdatas<T: AlignRecord>(
     let query_chro = rec.query_name();
     match cigar {
         'M' | '=' | 'X' => {
-            // bc of wfmash, like some 1= 2=, we need to skip them
-            if length >= 5 && length > skip_cutoff {
-                let mut base_plotdata = BasePlotdata {
-                    ref_start: *ref_current_offset,
-                    ref_end: *ref_current_offset + length as u64,
-                    query_start: *query_current_offset,
-                    query_end: *query_current_offset + length as u64,
-                    cigar: 'M',
+            let ref_current_end = *ref_current_offset + length as u64;
+            let query_current_end = *query_current_offset + length as u64;
+            if !*last_m {
+                let mut plot_data = BasePlotdata {
                     ref_chro: ref_chro.to_string(),
+                    ref_start: *ref_current_offset,
+                    ref_end: ref_current_end,
                     query_chro: query_chro.to_string(),
+                    query_start: *query_current_offset,
+                    query_end: query_current_end,
+                    cigar: 'M',
                 };
-                reserve_query_start_end(negative, &mut base_plotdata);
-                base_plotdata_vec.push(base_plotdata);
+                reserve_query_start_end(negative, &mut plot_data);
+                base_plotdata_vec.push(plot_data);
+            } else {
+                let modify = base_plotdata_vec.last_mut().unwrap();
+                if negative {
+                    modify.ref_end = ref_current_end;
+                    modify.query_start = query_current_end;
+                } else {
+                    modify.ref_end = ref_current_end;
+                    modify.query_end = query_current_end;
+                }
             }
+            // update current_offset
             *ref_current_offset += length as u64;
             *query_current_offset += length as u64;
+            *last_m = true;
         }
         'I' => {
+            let query_current_end = *query_current_offset + length as u64;
             if length > skip_cutoff {
-                let mut base_plotdata = BasePlotdata {
+                let mut plot_data = BasePlotdata {
+                    ref_chro: ref_chro.to_string(),
                     ref_start: *ref_current_offset,
                     ref_end: *ref_current_offset,
-                    query_start: *query_current_offset,
-                    query_end: *query_current_offset + length as u64,
-                    cigar,
-                    ref_chro: ref_chro.to_string(),
                     query_chro: query_chro.to_string(),
+                    query_start: *query_current_offset,
+                    query_end: query_current_end,
+                    cigar: 'I',
                 };
-                reserve_query_start_end(negative, &mut base_plotdata);
-                base_plotdata_vec.push(base_plotdata);
+                reserve_query_start_end(negative, &mut plot_data);
+                base_plotdata_vec.push(plot_data);
+                *last_m = false;
+            } else if *last_m {
+                let modify = base_plotdata_vec.last_mut().unwrap();
+                if negative {
+                    modify.query_start = query_current_end;
+                } else {
+                    modify.query_end = query_current_end;
+                }
+                *last_m = true;
             }
+            // update current_offset
             *query_current_offset += length as u64;
         }
         'D' => {
+            let ref_current_end = *ref_current_offset + length as u64;
             if length > skip_cutoff {
-                let mut base_plotdata = BasePlotdata {
+                let mut plot_data = BasePlotdata {
+                    ref_chro: ref_chro.to_string(),
                     ref_start: *ref_current_offset,
-                    ref_end: *ref_current_offset + length as u64,
+                    ref_end: ref_current_end,
+                    query_chro: query_chro.to_string(),
                     query_start: *query_current_offset,
                     query_end: *query_current_offset,
-                    cigar,
-                    ref_chro: ref_chro.to_string(),
-                    query_chro: query_chro.to_string(),
+                    cigar: 'D',
                 };
-                reserve_query_start_end(negative, &mut base_plotdata);
-                base_plotdata_vec.push(base_plotdata);
+                reserve_query_start_end(negative, &mut plot_data);
+                base_plotdata_vec.push(plot_data);
+                *last_m = false;
+            } else if *last_m {
+                let modify = base_plotdata_vec.last_mut().unwrap();
+                modify.ref_end = ref_current_end;
+                *last_m = true;
             }
+            // update current_offset
             *ref_current_offset += length as u64;
         }
         _ => {}
@@ -873,6 +905,8 @@ pub fn parse_cigar_to_base_plotdata<T: AlignRecord>(
     let mut ref_current_offset = ref_start;
     let mut query_current_offset = query_start;
     let mut base_plotdata_vec = Vec::new();
+    let mut last_m = false;
+
     let (_, res) = fold_many1(
         parse_cigar_str_tuple,
         null,
@@ -887,6 +921,7 @@ pub fn parse_cigar_to_base_plotdata<T: AlignRecord>(
                     cigarunit.len as usize,
                     skip_cutoff,
                     &mut base_plotdata_vec,
+                    &mut last_m,
                 );
             }
             res
@@ -908,6 +943,8 @@ pub fn parse_maf_to_base_plotdata<T: AlignRecord>(
     let mut ref_current_offset = ref_start;
     let mut query_current_offset = query_start;
     let mut base_plotdata_vec = Vec::new();
+    let mut last_m = false;
+
     let group_by_iter = seq1_iter
         .zip(seq2_iter)
         .group_by(|(c1, c2)| cigar_cat_ext(c1, c2));
@@ -921,6 +958,7 @@ pub fn parse_maf_to_base_plotdata<T: AlignRecord>(
             length,
             skip_cutoff,
             &mut base_plotdata_vec,
+            &mut last_m,
         );
     }
     Ok(base_plotdata_vec)
