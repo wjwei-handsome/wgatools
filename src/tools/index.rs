@@ -39,11 +39,34 @@ pub fn build_index(
             let size = sline.size;
             let strand = sline.strand;
 
-            idx.entry(name.clone()).or_insert(MafIndexItem {
-                ivls: Vec::new(),
-                size,
-                ord,
-            });
+            // idx.entry(name.clone()).or_insert(MafIndexItem {
+            //     ivls: Vec::new(),
+            //     size,
+            //     ord,
+            // });
+
+            if !idx.contains_key(&name) {
+                idx.insert(
+                    name.clone(),
+                    MafIndexItem {
+                        ivls: Vec::new(),
+                        size,
+                        ord,
+                    },
+                );
+            } else {
+                // compare ord if same
+                if idx
+                    .get(&name)
+                    .ok_or(WGAError::Other(anyhow!("not excepted")))?
+                    .ord
+                    != ord
+                {
+                    return Err(WGAError::Other(anyhow!(
+                        "There is a different order between Records!"
+                    )));
+                }
+            }
 
             idx.get_mut(&name)
                 .ok_or(WGAError::Other(anyhow!("not excepted")))?
