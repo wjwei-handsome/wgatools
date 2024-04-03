@@ -484,6 +484,13 @@ pub fn wrap_chunk(
     rewrite: bool,
     length: u64,
 ) -> Result<(), WGAError> {
+    // check length > 0
+    if length == 0 {
+        return Err(WGAError::Other(anyhow::anyhow!(
+            "`length` should be greater than 0"
+        )));
+    }
+
     // prepare reader and writer
     let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
 
