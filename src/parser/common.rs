@@ -176,14 +176,17 @@ pub trait AlignRecord {
 }
 
 /// Re-count align-size from seqs
-pub fn recount_align_size(seq: &str) -> u64 {
+pub fn recount_align_size(seq: &str) -> (u64, u64) {
     let mut align_size = 0;
+    let mut gap_size = 0;
     for c in seq.chars() {
         if c != '-' {
             align_size += 1;
+        } else {
+            gap_size += 1;
         }
     }
-    align_size
+    (align_size, gap_size)
 }
 
 #[derive(Debug, ValueEnum, Clone, Copy)]
