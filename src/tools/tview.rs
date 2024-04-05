@@ -118,7 +118,8 @@ impl Navigation {
     fn update_input(&mut self) {
         let name = &self.cddt_name[self.select_name_idx];
         let region = &self.cddt_region[self.select_region_idx];
-        let replace_text = format!("{}:{}", name, region);
+        let start = region.split('-').collect::<Vec<&str>>()[0];
+        let replace_text = format!("{}:{}", name, start);
         self.input.replace_range(6.., &replace_text);
         self.cursor_position = self.input.len();
     }
@@ -227,8 +228,8 @@ impl MafViewApp<'_, File> {
 
         let ref_seq = &init_sline.seq;
 
-        let (axis_text, indicator_text, len_count) =
-            get_axis_idc_len(ref_seq, scroll.ref_start, WINDOW_SIZE);
+        let (axis_text, indicator_text, len_count, _newdestpos) =
+            get_axis_idc_len(ref_seq, scroll.ref_start, WINDOW_SIZE, scroll.destpos);
 
         let mut para_lines = vec![
             Line::from(axis_text.red()),
@@ -287,8 +288,9 @@ impl MafViewApp<'_, File> {
                 let ref_start = sline.start;
                 let ref_seq = &sline.seq;
 
-                let (axis_text, indicator_text, len_count) =
-                    get_axis_idc_len(ref_seq, ref_start, WINDOW_SIZE);
+                let (axis_text, indicator_text, len_count, newdestpos) =
+                    get_axis_idc_len(ref_seq, ref_start, WINDOW_SIZE, self.scroll.destpos);
+                self.scroll.destpos = newdestpos;
                 let first_3_para_lines = vec![
                     Line::from(axis_text.red()),
                     Line::from(indicator_text.yellow()),
@@ -312,9 +314,9 @@ impl MafViewApp<'_, File> {
         self.scroll.para_lines.append(&mut add_para_lines);
         self.fixed.append(&mut add_fixed_lines);
         // scroll
-        let current_pos = self.scroll.ref_start + self.scroll.scroll as u64;
-        let scroll_size = self.scroll.destpos - current_pos;
-        self.scroll.scroll_right(scroll_size as usize);
+        // let current_pos = self.scroll.ref_start + self.scroll.scroll as u64;
+        // let scroll_size = self.scroll.destpos - self.scroll.ref_start;
+        self.scroll.scroll_right(self.scroll.destpos as usize);
         self.navigation.show = false;
         Ok(())
     }
@@ -521,34 +523,48 @@ fn main_ui(f: &mut Frame, app: &mut MafViewApp<'_, File>) {
     }
 }
 
-fn get_axis_idc_len(seq: &str, start: u64, window_size: usize) -> (String, String, usize) {
+fn get_axis_idc_len(
+    seq: &str,
+    start: u64,
+    window_size: usize,
+    destpos: u64,
+) -> (String, String, usize, u64) {
     let start = start + 1; // MAF is 0-based
     let mut axis_text = String::new();
     let mut indicator_text = String::new();
     let mut idx = 0;
     let mut len_count = 0;
+    let mut base_count = 0;
+    let mut walk_size = 0;
     for base in seq.chars() {
+        if base_count <= destpos - (start - 1) {
+            walk_size += 1
+        }
         len_count += 1;
         if base == '-' {
             axis_text.push(' ');
             indicator_text.push(' ');
-        } else if idx % window_size == 0 {
-            let pos = start + idx as u64;
-            axis_text.push_str(&format!(
-                "{:width$}",
-                pos.to_string(),
-                width = { window_size }
-            ));
-            indicator_text.push('|');
-            idx += 1
         } else {
-            indicator_text.push(' ');
-            idx += 1
+            base_count += 1;
+            if idx % window_size == 0 {
+                let pos = start + idx as u64;
+                axis_text.push_str(&format!(
+                    "{:width$}",
+                    pos.to_string(),
+                    width = { window_size }
+                ));
+                indicator_text.push('|');
+            } else {
+                indicator_text.push(' ');
+            }
+            idx += 1;
         }
     }
+
     axis_text.push('\n');
     indicator_text.push('\n');
-    (axis_text, indicator_text, len_count)
+    walk_size -= 1;
+    (axis_text, indicator_text, len_count, walk_size)
 }
 
 fn ivvec2strvec(invec: &[Iv]) -> Vec<String> {
@@ -559,48 +575,32 @@ fn ivvec2strvec(invec: &[Iv]) -> Vec<String> {
 }
 
 fn input_valid_update(app: &mut MafViewApp<'_, File>) -> Result<(), WGAError> {
-    let re = Regex::new(r"^[a-zA-Z0-9.@-_#]+:[0-9]+-[0-9]+?$")?; // NO ERROR
+    let re = Regex::new(r"^[a-zA-Z0-9.\-@_#]+:[0-9]+?$")?; // NO ERROR
     match re.is_match(&app.navigation.input[6..]) {
         true => {
             let name = &app.navigation.input[6..].split(':').collect::<Vec<&str>>()[0];
             match app.navigation.cddt_name.iter().position(|i| i == name) {
                 Some(name_idx) => {
-                    let region = &app.navigation.input[6..].split(':').collect::<Vec<&str>>()[1];
-                    let start = match region.split('-').collect::<Vec<&str>>()[0].parse::<usize>() {
+                    let raw_start = &app.navigation.input[6..].split(':').collect::<Vec<&str>>()[1];
+                    let start = match raw_start.parse::<usize>() {
                         Ok(i) => i,
                         Err(_) => {
                             app.navigation.input_valid = false;
                             0
                         }
                     };
-                    let end = match region.contains('-') {
-                        true => {
-                            match region.split('-').collect::<Vec<&str>>()[1].parse::<usize>() {
-                                Ok(i) => i,
-                                Err(_) => {
-                                    app.navigation.input_valid = false;
-                                    0
-                                }
-                            }
-                        }
-                        false => start,
-                    };
-                    if start > end {
+                    let cddt_regions: &Vec<Iv> = &app.navigation.all_regions[name_idx];
+                    let lapper = Lapper::new(cddt_regions.clone());
+                    let find = lapper
+                        .find(start as u64, start as u64 + 1)
+                        .collect::<Vec<&Iv>>();
+                    if find.is_empty() {
                         app.navigation.input_valid = false;
                     } else {
-                        let cddt_regions: &Vec<Iv> = &app.navigation.all_regions[name_idx];
-                        let lapper = Lapper::new(cddt_regions.clone());
-                        let find = lapper
-                            .find(start as u64, start as u64 + 1)
-                            .collect::<Vec<&Iv>>();
-                        if find.is_empty() {
-                            app.navigation.input_valid = false;
-                        } else {
-                            let dest_block = find[0];
-                            app.scroll.seek = dest_block.val;
-                            app.scroll.destpos = start as u64;
-                            app.scroll.ref_name = name.to_string();
-                        }
+                        let dest_block = find[0];
+                        app.scroll.seek = dest_block.val;
+                        app.scroll.destpos = start as u64;
+                        app.scroll.ref_name = name.to_string();
                     }
                 }
                 None => {
