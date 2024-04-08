@@ -1,4 +1,5 @@
 use crate::{
+    cli::Cli,
     converter::{chain2maf, chain2paf, maf2chain, maf2paf, maf2sam, paf2chain, paf2maf},
     errors::WGAError,
     parser::{
@@ -20,6 +21,8 @@ use crate::{
         stat::{stat_maf, stat_paf}, // trimovp::trim_ovp,
     },
 };
+use clap::CommandFactory;
+use clap_complete::{generate, Shell};
 use log::{info, warn};
 use std::io::{stdin, stdout, BufRead, BufReader, BufWriter, Stdin, Write};
 use std::path::Path;
@@ -541,5 +544,13 @@ pub fn wrap_dotplot(
         no_identity,
         cutoff,
     )?;
+    Ok(())
+}
+
+/// A wrapper for gen-auto-completion
+pub fn wrap_gencomp(shell: Shell, output: &str, rewrite: bool) -> Result<(), WGAError> {
+    let mut cmd = Cli::command();
+    let mut writer = get_output_writer(output, rewrite)?;
+    generate(shell, &mut cmd, "wgatools", &mut writer);
     Ok(())
 }
