@@ -112,6 +112,12 @@ GLOBAL:
 
 **Each subcommand could be used with `-h` or `--help` to get more information.**
 
+### Auto-Completion for easy-use
+
+```shell
+wgatools gen-completion --shell fish > ~/.config/fish/completions/wgatools.fish
+```
+Ready to enjoy it!
 
 ### Format Conversion
 
