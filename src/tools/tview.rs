@@ -40,7 +40,7 @@ impl Scroll<'_> {
         self.scroll_state = self.scroll_state.position(self.scroll);
     }
 
-    fn scroll_right(&mut self, step: usize) {
+    fn scroll_right(&mut self, step: usize) -> Result<(), WGAError> {
         if self.scroll + step > self.block_size {
             self.scroll = self.block_size;
         } else {
@@ -48,6 +48,10 @@ impl Scroll<'_> {
         }
         // self.scroll = self.scroll.saturating_add(step);
         self.scroll_state = self.scroll_state.position(self.scroll);
+        if self.scroll > u16::MAX as usize {
+            return Err(WGAError::Other(anyhow::anyhow!("scroll out of u16 range, This error is due to the scrolling limit of `ratatui`(https://github.com/ratatui-org/ratatui/issues/399). You can temporarily use the `chunk` subcommand to chunk it with a appropriate size (< 65535).")));
+        }
+        Ok(())
     }
 
     fn scroll_init(&mut self) {
@@ -316,7 +320,7 @@ impl MafViewApp<'_, File> {
         // scroll
         // let current_pos = self.scroll.ref_start + self.scroll.scroll as u64;
         // let scroll_size = self.scroll.destpos - self.scroll.ref_start;
-        self.scroll.scroll_right(self.scroll.destpos as usize);
+        self.scroll.scroll_right(self.scroll.destpos as usize)?;
         self.navigation.show = false;
         Ok(())
     }
@@ -335,16 +339,29 @@ pub fn tview(input: &String, step: usize) -> Result<(), WGAError> {
 
     // run app
     let tick_rate = Duration::from_millis(250);
-    run_app(&mut terminal, app, tick_rate, step)?;
-
-    // restore terminal
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
+    match run_app(&mut terminal, app, tick_rate, step) {
+        Ok(_) => {
+            // restore terminal
+            disable_raw_mode()?;
+            execute!(
+                terminal.backend_mut(),
+                LeaveAlternateScreen,
+                DisableMouseCapture
+            )?;
+            terminal.show_cursor()?;
+        }
+        Err(e) => {
+            // restore terminal
+            disable_raw_mode()?;
+            execute!(
+                terminal.backend_mut(),
+                LeaveAlternateScreen,
+                DisableMouseCapture
+            )?;
+            terminal.show_cursor()?;
+            return Err(e);
+        }
+    }
 
     Ok(())
 }
@@ -374,7 +391,7 @@ fn run_app<B: Backend>(
                         if app.navigation.show {
                             app.navigation.move_cursor_right();
                         } else {
-                            app.scroll.scroll_right(step);
+                            app.scroll.scroll_right(step)?;
                         }
                     }
                     KeyCode::Up => {
