@@ -1,6 +1,7 @@
 use crate::parser::common::{DotplotMode, DotplotoutFormat, FileFormat};
 use clap::ArgAction;
 use clap::{command, Parser, Subcommand};
+use clap_complete::Shell;
 
 #[derive(Parser)]
 #[command(name = "wgatools")]
@@ -248,6 +249,13 @@ pub enum Commands {
     //     #[arg(required = false)]
     //     input: Option<String>,
     // },
+    /// Generate completion script for shell
+    #[command(visible_alias = "gc", name = "gen-completion")]
+    GenCompletion {
+        /// Shell name, support bash, zsh, fish
+        #[arg(required = true, long, short)]
+        shell: Shell,
+    },
 }
 
 pub fn make_cli_parse() -> Cli {
