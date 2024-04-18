@@ -350,13 +350,18 @@ fn call_within_var(
 
                         let ref_base = &t_seq_ref[t_slice_start..t_slice_end];
                         let alt_base = &q_seq_ref[q_slice_start..q_slice_end];
+
+                        let queryinfo = format!(
+                            "{}{}@{}@{}",
+                            init_format, q_chro, query_current_offset, format_surfix
+                        );
                         let record = get_variant_rec(
                             chro,
                             target_current_offset as usize + 1,
                             ref_base,
                             alt_base,
                             None,
-                            None,
+                            Some(&queryinfo),
                         );
                         var_recs.push(record?);
                         target_current_offset += 1;
