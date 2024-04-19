@@ -20,6 +20,7 @@ where
     pub fn new(reader: R) -> Self {
         PAFReader {
             inner: ReaderBuilder::new()
+                .flexible(true)
                 .delimiter(b'\t')
                 .has_headers(false)
                 .comment(Some(b'#'))
