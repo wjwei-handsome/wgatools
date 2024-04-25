@@ -46,6 +46,7 @@ pub fn filter_paf<R: Read + Send>(
     min_query_size: u64,
 ) -> Result<(), WGAError> {
     let mut pafwtr = csv::WriterBuilder::new()
+        .flexible(true)
         .delimiter(b'\t')
         .has_headers(false)
         .from_writer(writer);
@@ -141,6 +142,7 @@ pub fn filter_paf_align_pair<R: Read + Send>(
         )?;
 
     let mut pafwtr = csv::WriterBuilder::new()
+        .flexible(true)
         .delimiter(b'\t')
         .has_headers(false)
         .from_writer(writer);
