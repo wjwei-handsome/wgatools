@@ -1,3 +1,4 @@
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/wgatools/badges/platforms.svg)](https://anaconda.org/bioconda/wgatools)
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/wjwei-handsome/wgatools/ci.yml)
 ![GitHub repo size](https://img.shields.io/github/repo-size/wjwei-handsome/wgatools)
 
