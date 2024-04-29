@@ -9,6 +9,14 @@
 
 ## Install
 
+### Conda
+
+```shell
+conda install wgatools -c bioconda
+```
+
+### Build from source
+
 ```shell
 git clone https://github.com/wjwei-handsome/wgatools.git
 cd wgatools
@@ -57,15 +65,7 @@ singularity build wgatools-$(git log -1 --format=%h --abbrev=8).sif docker-daemo
 
 This can be useful when running on HPCs where it might be difficult to build wgatools.
 
-## USAGE
-
 ## TOOLS
-
-
-
-
-
-
 
 ### Usage
 
@@ -136,7 +136,8 @@ or to convert PAF to MAF:
 wgatools paf2maf test.paf --target target.fa --query query.fa > test.maf
 ```
 
-> NOTE: If you want to convert into MAF format, you should provide target and query genome sequence files in [.fa/.fa.gz].
+> [!TIP]
+> If you want to convert into MAF format, you should provide target and query genome sequence files in {.fa, .fa.gz}.
 
 stdin and stdout are supported, so you can use pipes to chain commands together🪆:
 
@@ -166,6 +167,7 @@ In Interactive html, you can click on the legend to view only the types of inter
 
 ![base2](https://raw.githubusercontent.com/wjwei-handsome/wwjPic/main/img/20240324025906.png)
 
+> [!WARNING]
 >NOTE: For better interactivity, the `zoom` function is turned on. However, if there is too much data, the effect may be limited by your browser performance.
 
 This [simple example](https://github.com/wjwei-handsome/wgatools/blob/master/test/test.html) can be found in the [test](https://github.com/wjwei-handsome/wgatools/tree/master/test) directory.
@@ -191,8 +193,7 @@ wgatools maf-index test.maf
 
 wgatools maf-extract test.maf -r chr1:1-10,chr2:66-888,chr3:100-50,chr_no:1-10,x:y-z
 ```
-
-> NOTE:
+> [!TIP]
 > 1. Support multi-interval input, separated by commas
 > 2. Support `bed` input to specify interval
 > 3. Mismatched interval are skipped and warned
@@ -254,8 +255,8 @@ ref.chr8	181470894	.	C	T	.	.	.	GT	1|1
 ref.chr8	181470895	.	A	T	.	.	.	GT	1|1
 ref.chr8	181470903	.	G	A	.	.	.	GT	1|1
 ```
-
-> NOTE: This function does not support the identification of chromosomal rearrangements such as `DUP`, as this requires the extraction of sequences for realignment.
+> [!IMPORTANT]
+> This function does not support the identification of chromosomal rearrangements such as `DUP`, as this requires the extraction of sequences for realignment.
 
 ### Chunk MAF file by length
 
@@ -352,7 +353,8 @@ fn main() {
 - [ ] SAM converter [really need?]
 - [ ] Local improvement of alignment by re-alignment
 - [ ] MAF -> GAF -> HAL
-- [ ] dotplot
+- [ ] output gvcf for variants
+- [ ] call variants from PAF
 
 
 ## Contributing
