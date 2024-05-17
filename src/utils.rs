@@ -93,19 +93,35 @@ pub fn reverse_complement(input: &str) -> Result<String, WGAError> {
 }
 
 pub fn get_input_reader(input: &Option<String>) -> Result<Box<dyn BufRead + Send>, WGAError> {
-    let reader: Box<dyn BufRead + Send> = match input {
-        Some(path) => {
-            if path == "-" {
-                Box::new(BufReader::with_capacity(BUFFER_SIZE, stdin_reader()?))
-            } else {
-                match File::open(path) {
-                    Ok(file) => Box::new(BufReader::with_capacity(BUFFER_SIZE, file)),
-                    Err(_) => return Err(WGAError::FileNotExist(PathBuf::from(path))),
+    let reader: Box<dyn BufRead + Send> = if let Some(path)  = input {
+        
+        match File::open(path) {
+            Ok(file) => {
+                if path.ends_with(".xz") {
+                    // decode xz compressed file
+                    Box::new( 
+                        BufReader::with_capacity(BUFFER_SIZE, xz2::read::XzDecoder::new(file)) 
+                    )
+                } else if path.ends_with(".gz") {
+                    // decode gzip compressed file
+                    Box::new(
+                        BufReader::with_capacity(BUFFER_SIZE, flate2::read::MultiGzDecoder::new(file))
+                    )
+                } else if path.ends_with(".bz2") {
+                    // decode bzip2 compressed file
+                    Box::new(
+                        BufReader::with_capacity(BUFFER_SIZE, bzip2::read::MultiBzDecoder::new(file))
+                    )
+                } else { // stdin flag "-" covered
+                    Box::new(BufReader::with_capacity(BUFFER_SIZE, file))
                 }
-            }
+            },
+            Err(_) => return Err(WGAError::FileNotExist(PathBuf::from(path))),
         }
-        None => Box::new(BufReader::with_capacity(BUFFER_SIZE, stdin_reader()?)),
+    } else {
+        Box::new(BufReader::with_capacity(BUFFER_SIZE, stdin_reader()?))
     };
+
     Ok(reader)
 }
 
@@ -121,15 +137,35 @@ fn stdin_reader() -> Result<Stdin, WGAError> {
 
 fn get_output_writer(outputpath: &str, rewrite: bool) -> Result<Box<dyn Write>, WGAError> {
     check_outfile(outputpath, rewrite)?;
-    if outputpath == "-" {
-        Ok(Box::new(stdout()))
+    
+    let file = File::create(outputpath)?;
+    let compression_level: u32 = 6;
+
+    let writer: Box<dyn Write> = if outputpath.ends_with(".xz") {
+        // encode file to xz format
+        Box::new(
+            BufWriter::with_capacity(BUFFER_SIZE,xz2::write::XzEncoder::new(file, compression_level))
+        )
+    } else if outputpath.ends_with(".gz") {
+        // encode file to gzip format
+        Box::new(
+            BufWriter::with_capacity(BUFFER_SIZE, flate2::write::GzEncoder::new(file, flate2::Compression::new(compression_level)))
+        )
+    } else if outputpath.ends_with(".bz2"){
+        // encode file to bzip2 format
+        Box::new(
+            BufWriter::with_capacity(BUFFER_SIZE, bzip2::write::BzEncoder::new(file, bzip2::Compression::new(compression_level)))
+        )
     } else {
-        let file = File::create(outputpath)?;
-        Ok(Box::new(BufWriter::new(file)))
-    }
+        Box::new(
+            BufWriter::new(stdout())
+        )
+    };
+    
+    Ok(writer)
 }
 
-/// check if output file exists and if rewrite
+/// check if output file exists and if rewrite 
 fn check_outfile(output_file: &str, rewrite: bool) -> Result<(), WGAError> {
     // check if output file exists
     if output_file != "-" {

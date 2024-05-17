@@ -105,7 +105,7 @@ Options:
   -V, --version  Print version
 
 GLOBAL:
-  -o, --outfile <OUTFILE>  Output file ("-" for stdout) [default: -]
+  -o, --outfile <OUTFILE>  Output file ("-" for stdout), file name ending in .gz/.bz2/.xz will be compressed automatically [default: -]
   -r, --rewrite            Bool, if rewrite output file [default: false]
   -t, --threads <THREADS>  Threads, default 1 [default: 1]
   -v, --verbose...         Logging level [-v: Info, -vv: Debug, -vvv: Trace, defalut: Warn]
