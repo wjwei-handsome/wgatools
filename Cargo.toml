@@ -31,6 +31,9 @@ thiserror = "1.0.50"
 anyhow = "1.0.75"
 minijinja = "1.0.15"
 clap_complete = "4.5.1"
+xz2 = "0.1.7"
+flate2 = "1.0.30"
+bzip2 = "0.4.4"
 
 [lib]
 name = "wgalib"

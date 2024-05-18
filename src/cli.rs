@@ -17,7 +17,7 @@ help_template =
 ) // change template more!
 ]
 pub struct Cli {
-    /// Output file ("-" for stdout)
+    /// Output file ("-" for stdout), file name ending in .gz/.bz2/.xz will be compressed automatically
     #[arg(long, short, global = true, default_value = "-", help_heading = Some("GLOBAL"))]
     pub outfile: String,
     /// Bool, if rewrite output file [default: false]
