@@ -24,7 +24,7 @@ use crate::{
 use clap::CommandFactory;
 use clap_complete::{generate, Shell};
 use log::{info, warn};
-use std::io::{stdin, stdout, BufRead, BufReader, BufWriter, Stdin, Write};
+use std::{io::{stdin, stdout, BufRead, BufReader, BufWriter, Stdin, Write}, path};
 use std::path::Path;
 use std::{fs::File, path::PathBuf};
 
@@ -97,17 +97,17 @@ pub fn get_input_reader(input: &Option<String>) -> Result<Box<dyn BufRead + Send
         
         match File::open(path) {
             Ok(file) => {
-                if path.ends_with(".xz") {
+                if Path::new(path).extension().is_some_and(|ext| ext == "xz") {
                     // decode xz compressed file
                     Box::new( 
-                        BufReader::with_capacity(BUFFER_SIZE, xz2::read::XzDecoder::new(file)) 
+                        BufReader::with_capacity(BUFFER_SIZE, xz2::read::XzDecoder::new_multi_decoder(file)) 
                     )
-                } else if path.ends_with(".gz") {
+                } else if Path::new(path).extension().is_some_and(|ext| ext == "gz") {
                     // decode gzip compressed file
                     Box::new(
                         BufReader::with_capacity(BUFFER_SIZE, flate2::read::MultiGzDecoder::new(file))
                     )
-                } else if path.ends_with(".bz2") {
+                } else if Path::new(path).extension().is_some_and(|ext| ext == "bz2") {
                     // decode bzip2 compressed file
                     Box::new(
                         BufReader::with_capacity(BUFFER_SIZE, bzip2::read::MultiBzDecoder::new(file))
@@ -141,17 +141,17 @@ fn get_output_writer(outputpath: &str, rewrite: bool) -> Result<Box<dyn Write>, 
     let file = File::create(outputpath)?;
     let compression_level: u32 = 6;
 
-    let writer: Box<dyn Write> = if outputpath.ends_with(".xz") {
+    let writer: Box<dyn Write> = if Path::new(outputpath).extension().is_some_and(|ext| ext == "xz") {
         // encode file to xz format
         Box::new(
             BufWriter::with_capacity(BUFFER_SIZE,xz2::write::XzEncoder::new(file, compression_level))
         )
-    } else if outputpath.ends_with(".gz") {
+    } else if Path::new(outputpath).extension().is_some_and(|ext| ext == "gz") {
         // encode file to gzip format
         Box::new(
             BufWriter::with_capacity(BUFFER_SIZE, flate2::write::GzEncoder::new(file, flate2::Compression::new(compression_level)))
         )
-    } else if outputpath.ends_with(".bz2"){
+    } else if Path::new(outputpath).extension().is_some_and(|ext| ext == "bz2") {
         // encode file to bzip2 format
         Box::new(
             BufWriter::with_capacity(BUFFER_SIZE, bzip2::write::BzEncoder::new(file, bzip2::Compression::new(compression_level)))
