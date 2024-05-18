@@ -209,6 +209,8 @@ fn get_output_writer(outputpath: &str, rewrite: bool) -> Result<Box<dyn Write>, 
             BUFFER_SIZE,
             bzip2::write::BzEncoder::new(file, bzip2::Compression::new(compression_level)),
         ))
+    } else if outputpath != "-" {
+        Box::new(BufWriter::with_capacity(BUFFER_SIZE, file))
     } else {
         Box::new(BufWriter::new(stdout()))
     };
