@@ -177,9 +177,16 @@ fn stdin_reader() -> Result<Stdin, WGAError> {
 }
 
 fn get_output_writer(outputpath: &str, rewrite: bool) -> Result<Box<dyn Write>, WGAError> {
+    // check if output file exists
     check_outfile(outputpath, rewrite)?;
 
+    // if output is stdout, return stdout writer directly
+    if outputpath == "-" {
+        return Ok(Box::new(BufWriter::new(stdout())));
+    }
+
     let file = File::create(outputpath)?;
+    // TODO: add compression level option
     let compression_level: u32 = 6;
 
     let writer: Box<dyn Write> = if Path::new(outputpath)
