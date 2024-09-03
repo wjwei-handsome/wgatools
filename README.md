@@ -333,11 +333,6 @@ fn main() {
 }
 ```
 
-### TODO for library
-
-- [x] Error detection and handling
-- [ ] Test cases
-- [ ] Documentations
 
 [//]: # "> It should be extremely fast!![img](https://raw.githubusercontent.com/wjwei-handsome/wwjPic/main/img/20230706022535.png)"
 
@@ -347,6 +342,16 @@ fn main() {
 - use `rayon` to accelerate the speed of conversions
 - use `ratatui` to visualize MAF file in terminal
 - ...
+
+## Benchmark
+
+We use the [`hyperfine`](https://github.com/sharkdp/hyperfine) to compare the speed of conversion between `wgatools` and another Rust-based tool [`paf2chain`](https://github.com/AndreaGuarracino/paf2chain). The result is as follows:
+
+
+command                                                                                                   |mean              |stddev            |median            |user             |system            |min               |max
+:---------------------------------------------------------------------------------------------------------|:-----------------|:-----------------|:-----------------|:----------------|:-----------------|:-----------------|:-------------
+wgatools p2c Zm-CML333.paf -o foo                             |3.69|0.36|3.71     |3.46       |0.14           |3.25|4.09
+paf2chain --input Zm-CML333.paf > bar|16.28|0.86|16.27|3.80|12.03|15.01    |17.67
 
 ## ROADMAP
 
