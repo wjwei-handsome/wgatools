@@ -4,6 +4,8 @@
 
 ## *W*hole *G*enome *A*lignment **T**ools
 
+![logo](./logo.jpg)
+
 ## A Rust library and tools for whole genome alignment files
 
 
