@@ -1,7 +1,10 @@
 use crate::errors::WGAError;
 use crate::parser::chain::{ChainHeader, ChainReader, ChainRecord};
 use crate::parser::cigar::{
-    parse_cigar_to_blocks, parse_cigar_to_chain, parse_cigar_to_insert, parse_maf_seq_to_chain,
+    // parse_cigar_to_blocks,
+    parse_cigar_to_chain,
+    parse_cigar_to_insert,
+    parse_maf_seq_to_chain,
 };
 use crate::parser::common::{AlignRecord, Strand};
 use crate::parser::maf::{MAFReader, MAFRecord, MAFSLine, MAFWriter};
@@ -110,25 +113,25 @@ pub fn maf2sam<R: Read + Send>(
     Ok(())
 }
 
-/// Convert a PAF Reader to output a Blocks file
-pub fn paf2blocks<R: Read + Send>(
-    pafreader: &mut PAFReader<R>,
-    writer: &mut dyn Write,
-) -> Result<(), WGAError> {
-    // init writer and csv writer for deserializing
-    let mut wtr = csv::WriterBuilder::new()
-        .delimiter(b'\t')
-        .from_writer(writer);
+// /// Convert a PAF Reader to output a Blocks file
+// pub fn paf2blocks<R: Read + Send>(
+//     pafreader: &mut PAFReader<R>,
+//     writer: &mut dyn Write,
+// ) -> Result<(), WGAError> {
+//     // init writer and csv writer for deserializing
+//     let mut wtr = csv::WriterBuilder::new()
+//         .delimiter(b'\t')
+//         .from_writer(writer);
 
-    // iterate over records
-    for record in pafreader.records() {
-        let record = record?;
-        // nom the cigar string and write to file
-        parse_cigar_to_blocks(&record, &mut wtr)?;
-    }
-    wtr.flush()?;
-    Ok(())
-}
+//     // iterate over records
+//     for record in pafreader.records() {
+//         let record = record?;
+//         // nom the cigar string and write to file
+//         parse_cigar_to_blocks(&record, &mut wtr)?;
+//     }
+//     wtr.flush()?;
+//     Ok(())
+// }
 
 /// Convert a PAF Reader to output a Chain file
 pub fn paf2chain<R: Read + Send>(

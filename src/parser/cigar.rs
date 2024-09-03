@@ -79,77 +79,77 @@ fn null() -> Result<(), WGAError> {
     Ok(())
 }
 
-fn cigar_unit_block(
-    op: char,
-    count: u64,
-    wtr: &mut Writer<&mut dyn Write>,
-    block: &mut Block,
-) -> Result<(), WGAError> {
-    match op {
-        'M' => {
-            // move query&target
-            block.query_end += count;
-            block.target_end += count;
+// fn cigar_unit_block(
+//     op: char,
+//     count: u64,
+//     wtr: &mut Writer<&mut dyn Write>,
+//     block: &mut Block,
+// ) -> Result<(), WGAError> {
+//     match op {
+//         'M' => {
+//             // move query&target
+//             block.query_end += count;
+//             block.target_end += count;
 
-            // write and serialize
-            wtr.serialize(&block)?;
+//             // write and serialize
+//             wtr.serialize(&block)?;
 
-            // sync query&target start with end
-            block.query_start = block.query_end;
-            block.target_start = block.target_end;
-        }
-        'I' => {
-            // only move query start&end
-            block.query_end += count;
-            block.query_start += count;
-        }
-        'D' => {
-            // only move target start&end
-            block.target_end += count;
-            block.target_start += count;
-        }
-        _ => return Err(WGAError::CigarOpInvalid(op.to_string())), // TODO: handle `H` for SAM
-    };
-    Ok(())
-}
+//             // sync query&target start with end
+//             block.query_start = block.query_end;
+//             block.target_start = block.target_end;
+//         }
+//         'I' => {
+//             // only move query start&end
+//             block.query_end += count;
+//             block.query_start += count;
+//         }
+//         'D' => {
+//             // only move target start&end
+//             block.target_end += count;
+//             block.target_start += count;
+//         }
+//         _ => return Err(WGAError::CigarOpInvalid(op.to_string())), // TODO: handle `H` for SAM
+//     };
+//     Ok(())
+// }
 
 /// Parse cigar string of a AlignRecord[PafRecord, SamRecord] which includes cg:Z: tag and
 /// write into a blocks file
 /// - For PafRecord: cigar should only contains 'M,I,D'
 /// - For SamRecord: cigar's first `[0-9]+H` should represent the query start
-pub fn parse_cigar_to_blocks<T: AlignRecord>(
-    rec: &T,
-    wtr: &mut Writer<&mut dyn Write>,
-) -> Result<(), WGAError> {
-    // get cigar bytes and tags
-    let cigar = rec.get_cigar_str()?;
-    let (cigar, _tag) = tag("cg:Z:")(cigar)?;
+// pub fn parse_cigar_to_blocks<T: AlignRecord>(
+//     rec: &T,
+//     wtr: &mut Writer<&mut dyn Write>,
+// ) -> Result<(), WGAError> {
+//     // get cigar bytes and tags
+//     let cigar = rec.get_cigar_str()?;
+//     let (cigar, _tag) = tag("cg:Z:")(cigar)?;
 
-    // init a original block
-    let mut block = Block {
-        query_name: rec.query_name(),
-        query_start: rec.query_start(),
-        query_end: rec.query_start(),
-        target_name: rec.target_name(),
-        target_start: rec.target_start(),
-        target_end: rec.target_start(),
-        strand: rec.query_strand(),
-    };
+//     // init a original block
+//     let mut block = Block {
+//         query_name: rec.query_name(),
+//         query_start: rec.query_start(),
+//         query_end: rec.query_start(),
+//         target_name: rec.target_name(),
+//         target_start: rec.target_start(),
+//         target_end: rec.target_start(),
+//         strand: rec.query_strand(),
+//     };
 
-    // fold cigar bytes into many CigarUnits[#CigarUnit]
-    let (_, res) = fold_many1(
-        parse_cigar_str_tuple,
-        null,
-        |res: Result<(), WGAError>, cigarunit| {
-            if res.is_ok() {
-                let cigarunit = cst2cu(cigarunit)?;
-                cigar_unit_block(cigarunit.op, cigarunit.len, wtr, &mut block)?
-            }
-            res
-        },
-    )(cigar)?;
-    res
-}
+//     // fold cigar bytes into many CigarUnits[#CigarUnit]
+//     let (_, res) = fold_many1(
+//         parse_cigar_str_tuple,
+//         null,
+//         |res: Result<(), WGAError>, cigarunit| {
+//             if res.is_ok() {
+//                 let cigarunit = cst2cu(cigarunit)?;
+//                 cigar_unit_block(cigarunit.op, cigarunit.len, wtr, &mut block)?
+//             }
+//             res
+//         },
+//     )(cigar)?;
+//     res
+// }
 
 /// Parse maf seq to get indel count in head and tail
 pub fn parse_maf_seq_to_trim<T: AlignRecord>(rec: &T) -> Result<(u64, u64, u64, u64), WGAError> {
