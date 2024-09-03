@@ -1,0 +1,3 @@
+command,mean,stddev,median,user,system,min,max
+wgatools p2c ~/code/wgatools/data/output/misc/Zm-CML333.paf -o tmppppp -r -vvv,3.6959392804799998,0.3651627170170164,3.71619129228,3.46335428,0.14038,3.2523998022800003,4.09144842328
+~/code/paf2chain/target/release/paf2chain --input ~/code/wgatools/data/output/misc/Zm-CML333.paf > tmpqqqq,16.284346873380002,0.8659553774321763,16.279570181780002,3.808488079999999,12.030385299999999,15.00556493328,17.67365183828
