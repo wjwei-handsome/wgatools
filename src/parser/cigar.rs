@@ -151,7 +151,7 @@ fn null() -> Result<(), WGAError> {
 //     res
 // }
 
-/// Parse maf seq to get indel count in head and tail
+///   Parse maf seq to get indel count in head and tail
 pub fn parse_maf_seq_to_trim<T: AlignRecord>(rec: &T) -> Result<(u64, u64, u64, u64), WGAError> {
     let mut head_ins = 0;
     let mut head_del = 0;
@@ -302,6 +302,26 @@ pub fn cigar_cat_ext(c1: &char, c2: &char) -> char {
         'I'
     } else if c2 == &'-' {
         'D'
+    } else {
+        'X'
+    }
+}
+
+/// cigar category method for caller if follow the MAF format
+/// AAA--GGG
+/// AAA--GGC
+
+pub fn cigar_cat_ext_caller(c1: &char, c2: &char) -> char {
+    if c1 == &'-' {
+        if c2 == &'-' {
+            'W'
+        } else {
+            'I'
+        }
+    } else if c2 == &'-' {
+        'D'
+    } else if c1 == c2 {
+        '='
     } else {
         'X'
     }
