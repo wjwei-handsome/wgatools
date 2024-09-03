@@ -1,9 +1,9 @@
 use crate::errors::WGAError;
 use crate::parser::chain::{ChainDataLine, ChainRecord};
-use crate::parser::common::{AlignRecord, Block};
+use crate::parser::common::AlignRecord;
 use crate::tools::dotplot::BasePlotdata;
 use crate::utils::parse_str2u64;
-use csv::Writer;
+// use csv::Writer;
 use itertools::Itertools;
 use nom::bytes::complete::{tag, take_till, take_while};
 use nom::error::Error;
