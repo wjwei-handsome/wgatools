@@ -215,21 +215,21 @@ pub enum Commands {
         #[arg(required = true, long, short, value_delimiter = ',')]
         prefixs: Vec<String>,
     },
-    /// TEST: maf2sam
+    /// DEV: maf2sam
     #[command(visible_alias = "m2s", name = "maf2sam")]
     Maf2Sam {
         /// Input MAF File, None for STDIN
         #[arg(required = false)]
         input: Option<String>,
     },
-    /// TEST: pafcov
+    /// Calculate coverage for PAF file
     #[command(visible_alias = "pc", name = "pafcov")]
     PafCov {
         /// Input PAF File, None for STDIN
         #[arg(required = false)]
         input: Option<String>,
     },
-    /// TEST: generate pesudo maf from paf
+    /// Generate pesudo-maf for divergence analysis from PAF file
     #[command(visible_alias = "pp", name = "pafpseudo")]
     PafPseudo {
         /// Input PAF File, None for STDIN
@@ -256,6 +256,16 @@ pub enum Commands {
         #[arg(required = true, long, short)]
         shell: Shell,
     },
+    // /// TEST: Pileup
+    // #[command(visible_alias = "pl", name = "pileup")]
+    // Pileup {
+    //     /// Input MAF File, None for STDIN
+    //     #[arg(required = false)]
+    //     input: Option<String>,
+    //     /// Show all sites including no variation, default: false
+    //     #[arg(required = false, long, short, default_value = "false")]
+    //     all: bool,
+    // },
 }
 
 pub fn make_cli_parse() -> Cli {
