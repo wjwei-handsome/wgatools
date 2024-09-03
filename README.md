@@ -345,13 +345,13 @@ fn main() {
 
 ## Benchmark
 
-We use the [`hyperfine`](https://github.com/sharkdp/hyperfine) to compare the speed of conversion between `wgatools` and another Rust-based tool [`paf2chain`](https://github.com/AndreaGuarracino/paf2chain). The result is as follows:
+We use the [`hyperfine`](https://github.com/sharkdp/hyperfine) to compare the speed of conversion between `wgatools` and another Rust-based tool [`paf2chain`](https://github.com/AndreaGuarracino/paf2chain). The result is as follows (10 runs):
 
 
-command                                                                                                   |mean              |stddev            |median            |user             |system            |min               |max
+command|mean(sec)|stddev|median|user|system|min|max
 :---------------------------------------------------------------------------------------------------------|:-----------------|:-----------------|:-----------------|:----------------|:-----------------|:-----------------|:-------------
-wgatools p2c Zm-CML333.paf -o foo                             |3.69|0.36|3.71     |3.46       |0.14           |3.25|4.09
-paf2chain --input Zm-CML333.paf > bar|16.28|0.86|16.27|3.80|12.03|15.01    |17.67
+wgatools p2c Zm-CML333.paf -o foo|3.69|0.36|3.71|3.46|0.14|3.25|4.09
+paf2chain --input Zm-CML333.paf > bar|16.28|0.86|16.27|3.80|12.03|15.01|17.67
 
 ## ROADMAP
 
