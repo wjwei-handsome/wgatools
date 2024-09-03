@@ -1,5 +1,5 @@
 use crate::errors::WGAError;
-use crate::parser::cigar::cigar_cat_ext;
+use crate::parser::cigar::cigar_cat_ext_caller;
 use crate::parser::common::{AlignRecord, Strand};
 use crate::parser::maf::{MAFReader, MAFRecord};
 use crate::tools::index::MafIndex;
@@ -218,7 +218,7 @@ fn call_within_var(
     let q_seq_iter = mafrec.query_seq().chars();
     let group_by_iter = t_seq_iter
         .zip(q_seq_iter)
-        .group_by(|(c1, c2)| cigar_cat_ext(c1, c2));
+        .group_by(|(c1, c2)| cigar_cat_ext_caller(c1, c2));
 
     let mut init_info = String::new();
     if strand == Strand::Negative {
@@ -232,6 +232,9 @@ fn call_within_var(
                 target_current_offset += len;
                 query_current_offset += len;
                 after_m = true;
+            }
+            'W' => {
+                // do nothing
             }
             'I' => {
                 if len > svlen_cutoff {
