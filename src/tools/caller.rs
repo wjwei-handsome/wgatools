@@ -145,10 +145,7 @@ fn get_variant_rec(
     };
 
     let infos: recinfo = match info {
-        Some(info) => match info.parse() {
-            Ok(infos) => infos,
-            Err(_) => recinfo::default(),
-        },
+        Some(info) => info.parse().unwrap_or_default(),
         None => recinfo::default(),
     };
     Ok(Record::builder()
