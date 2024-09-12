@@ -10,3 +10,4 @@ pub mod rename;
 pub mod stat;
 pub mod trimovp;
 pub mod tview;
+pub mod validate;
