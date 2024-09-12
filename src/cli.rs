@@ -256,6 +256,16 @@ pub enum Commands {
         #[arg(required = true, long, short)]
         shell: Shell,
     },
+    /// Validate and fix query&target position in PAF file by CIGAR
+    #[command(visible_alias = "vf", name = "validate")]
+    Validate {
+        /// Input PAF File, None for STDIN
+        #[arg(required = false)]
+        input: Option<String>,
+        /// Fixed output file, None for NOT FIX, `-` will mix newoutput & information
+        #[arg(required = false, long, short)]
+        fix: Option<String>,
+    },
     // /// TEST: Pileup
     // #[command(visible_alias = "pl", name = "pileup")]
     // Pileup {

@@ -19,6 +19,7 @@ use crate::{
         pseudomaf::generate_pesudo_maf,
         rename::rename_maf,
         stat::{stat_maf, stat_paf}, // trimovp::trim_ovp,
+        validate::parallel_validatepaf,
     },
 };
 use clap::CommandFactory;
@@ -648,5 +649,42 @@ pub fn wrap_gencomp(shell: Shell, output: &str, rewrite: bool) -> Result<(), WGA
     let mut cmd = Cli::command();
     let mut writer = get_output_writer(output, rewrite)?;
     generate(shell, &mut cmd, "wgatools", &mut writer);
+    Ok(())
+}
+
+pub fn wrap_validate(
+    input: &Option<String>,
+    fix: &Option<String>,
+    output: &str,
+    rewrite: bool,
+) -> Result<(), WGAError> {
+    // prepare reader and writer
+    let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
+    let pafrdr = PAFReader::new(reader);
+
+    let fix_writer = match fix {
+        Some(path) => {
+            warn!("`fix` is set, will try to fix the query|target postion of paf file.It does NOT represent the alignment behavior.");
+            if path == "-" {
+                warn!("STDOUT mixed the validation information and new fixed paf records");
+            }
+            let input_path = match input {
+                Some(path) => path,
+                None => "stdin",
+            };
+            if path == input_path {
+                return Err(WGAError::Other(anyhow::anyhow!(
+                    "fixed file should not be the same as output file"
+                )));
+            }
+            let fix_writer = get_output_writer(path, true)?;
+            Some(fix_writer)
+        }
+        None => None,
+    };
+
+    let fix_flag = fix.is_some();
+    parallel_validatepaf(pafrdr, &mut writer, fix_writer, fix_flag)?;
+
     Ok(())
 }

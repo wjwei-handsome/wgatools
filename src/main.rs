@@ -7,6 +7,7 @@ use wgalib::utils::{
     wrap_build_index, wrap_chain2maf, wrap_chain2paf, wrap_chunk, wrap_dotplot, wrap_filter,
     wrap_gencomp, wrap_maf2chain, wrap_maf2paf, wrap_maf2sam, wrap_maf_call, wrap_maf_extract,
     wrap_paf2chain, wrap_paf2maf, wrap_paf_cov, wrap_paf_pesudo_maf, wrap_rename_maf, wrap_stat,
+    wrap_validate,
 };
 
 fn main() {
@@ -155,6 +156,9 @@ fn main_entry() -> Result<(), WGAError> {
         }
         Commands::GenCompletion { shell } => {
             wrap_gencomp(*shell, &outfile, rewrite)?;
+        }
+        Commands::Validate { input, fix } => {
+            wrap_validate(input, fix, &outfile, rewrite)?;
         }
     }
     Ok(())
