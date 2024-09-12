@@ -82,25 +82,27 @@ Authors: Wenjie Wei <wjwei9908@gmail.com>
 Usage: wgatools [OPTIONS] <COMMAND>
 
 Commands:
-  maf2paf    Convert MAF format to PAF format [aliases: m2p]
-  maf2chain  Convert MAF format to Chain format [aliases: m2c]
-  paf2maf    Convert PAF format to MAF format [aliases: p2m]
-  paf2chain  Convert PAF format to Chain format [aliases: p2c]
-  chain2maf  Convert Chain format to MAF format [aliases: c2m]
-  chain2paf  Convert Chain format to PAF format [aliases: c2p]
-  maf-index  Build index for MAF file [aliases: mi]
-  maf-ext    Extract specific region from MAF file with index [aliases: me]
-  call       Call Variants from MAF file [aliases: c]
-  tview      View MAF file in terminal [aliases: tv]
-  stat       Statistics for Alignment file [aliases: st]
-  dotplot    TEST: Plot dotplot for Alignment file [aliases: dp]
-  filter     Filter records for Alignment file [aliases: fl]
-  rename     Rename MAF records with prefix [aliases: rn]
-  maf2sam    TEST: maf2sam [aliases: m2s]
-  pafcov     TEST: pafcov [aliases: pc]
-  pafpseudo  TEST: generate pesudo maf from paf [aliases: pp]
-  chunk      Chunk MAF file by length [aliases: ch]
-  help       Print this message or the help of the given subcommand(s)
+  maf2paf         Convert MAF format to PAF format [aliases: m2p]
+  maf2chain       Convert MAF format to Chain format [aliases: m2c]
+  paf2maf         Convert PAF format to MAF format [aliases: p2m]
+  paf2chain       Convert PAF format to Chain format [aliases: p2c]
+  chain2maf       Convert Chain format to MAF format [aliases: c2m]
+  chain2paf       Convert Chain format to PAF format [aliases: c2p]
+  maf-index       Build index for MAF file [aliases: mi]
+  maf-ext         Extract specific region from MAF file with index [aliases: me]
+  chunk           Chunk MAF file by length [aliases: ch]
+  call            Call Variants from MAF file [aliases: c]
+  tview           View MAF file in terminal [aliases: tv]
+  stat            Statistics for Alignment file [aliases: st]
+  dotplot         Plot dotplot for Alignment file [aliases: dp]
+  filter          Filter records for Alignment file [aliases: fl]
+  rename          Rename MAF records with prefix [aliases: rn]
+  maf2sam         DEV: maf2sam [aliases: m2s]
+  pafcov          Calculate coverage for PAF file [aliases: pc]
+  pafpseudo       Generate pesudo-maf for divergence analysis from PAF file [aliases: pp]
+  gen-completion  Generate completion script for shell [aliases: gc]
+  validate        Validate and fix query&target position in PAF file by CIGAR [aliases: vf]
+  help            Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help     Print help (see more with '--help')
@@ -273,6 +275,24 @@ wgatools chunk -l 100 test/test.maf -o chunked.maf
 wgatools stat test.maf
 wgatools stat -f paf test.paf
 wgatools stat test.maf
+```
+
+### Validate and fix PAF file
+
+In some cases, the PAF file may be incorrect, such as the `query` and `target` [postions are wrong](https://github.com/wjwei-handsome/wgatools/issues/15), or CIGAR string is unmatch with sequences. You can use this command to validate and fix the PAF file:
+
+```shell
+## just validate
+> wgatools validate wrong.paf
+
+Total records: 2306
+Query invalid records: 2283
+Target invalid records: 80
+Query invalid list:...
+Target invalid list:...
+## validate and fix
+> wgatools validate wrong.paf -f happy.paf
+
 ```
 
 ### Filter records for MAF/PAF file
