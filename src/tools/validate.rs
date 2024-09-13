@@ -80,7 +80,8 @@ fn process_record(
     let exp_query_end = rec.query_start()
         + rec_stat.matched as u64
         + rec_stat.mismatched as u64
-        + rec_stat.ins_size as u64;
+        + rec_stat.ins_size as u64
+        + rec_stat.inv_ins_size as u64;
     if exp_query_end != rec.query_end() {
         vd.query_invalid += 1;
         let query_uid = format!(
@@ -97,7 +98,8 @@ fn process_record(
     let exp_ref_end = rec.target_start()
         + rec_stat.matched as u64
         + rec_stat.mismatched as u64
-        + rec_stat.del_size as u64;
+        + rec_stat.del_size as u64
+        + rec_stat.inv_del_size as u64;
     if exp_ref_end != rec.target_end() {
         vd.ref_invalid += 1;
         let ref_uid = format!(
@@ -128,6 +130,7 @@ fn process_validations(
     if let Some(writer) = fix_writer {
         let mut pafwtr = csv::WriterBuilder::new()
             .delimiter(b'\t')
+            .flexible(true)
             .has_headers(false)
             .from_writer(writer);
         for rec in validations.fix_paf_recs {
