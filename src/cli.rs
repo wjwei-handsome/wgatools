@@ -257,7 +257,10 @@ pub enum Commands {
         shell: Shell,
     },
     /// Validate and fix query&target position in PAF file by CIGAR
-    #[command(visible_alias = "vf", name = "validate")]
+    /// Examples:
+    /// wgatools validate wrong.paf // output report to STDOUT
+    /// wgatools validate wrong.paf -f happy.paf -o fix.report
+    #[command(visible_alias = "vf", name = "validate", verbatim_doc_comment)]
     Validate {
         /// Input PAF File, None for STDIN
         #[arg(required = false)]
@@ -265,6 +268,9 @@ pub enum Commands {
         /// Fixed output file, None for NOT FIX, `-` will mix newoutput & information
         #[arg(required = false, long, short)]
         fix: Option<String>,
+        // /// Carefully validate mode, will not fix any record, default: false
+        // #[arg(required = false, long, short, default_value = "false")]
+        // careful: bool,
     },
     // /// TEST: Pileup
     // #[command(visible_alias = "pl", name = "pileup")]
