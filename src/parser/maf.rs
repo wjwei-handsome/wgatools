@@ -381,8 +381,8 @@ impl AlignRecord for MAFRecord {
         self.slines[0].align_size
     }
 
-    fn get_cigar_string(&self) -> String {
-        parse_maf_seq_to_cigar(self, false).cigar_string
+    fn get_cigar_string(&self) -> Result<String, WGAError> {
+        Ok(parse_maf_seq_to_cigar(self, false).cigar_string)
     }
 
     fn convert2paf(&self) -> Result<PafRecord, WGAError> {
