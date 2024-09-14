@@ -34,9 +34,9 @@ pub fn pafcov<R: Read + Send>(
             let target_name = rec.target_name().to_string();
             let target_length = rec.target_length() as usize;
             let cov_vec = acc.entry(target_name).or_insert(vec![0; target_length]);
-            let cigar = rec.get_cigar_str()?;
+            let cigar = rec.get_cigar_string()?;
             let start = rec.target_start() as usize;
-            update_cov_vec(cov_vec, cigar, start)?;
+            update_cov_vec(cov_vec, &cigar, start)?;
             Ok::<HashMap<String, Vec<usize>>, WGAError>(acc)
         })
         .try_reduce(HashMap::new, |mut acc, mut map| {

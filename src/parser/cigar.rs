@@ -207,8 +207,8 @@ pub fn parse_cigar_to_trim<T: AlignRecord>(rec: &T) -> Result<(u64, u64, u64, u6
 
     let mut head_indel = true;
 
-    let cigar = rec.get_cigar_str()?;
-    let (cigar, _tag) = tag("cg:Z:")(cigar)?;
+    let cigar = rec.get_cigar_string()?;
+    let (cigar, _tag) = tag("cg:Z:")(cigar.as_str())?;
 
     let (_, _) = fold_many1(
         parse_cigar_str_tuple,
@@ -254,8 +254,8 @@ pub fn parse_cigar_to_chain<T: AlignRecord>(
     // ) -> Result<(&'a str, Result<(), WGAError>), WGAError> {
 ) -> Result<(), WGAError> {
     // get cigar bytes and tag
-    let cigar = rec.get_cigar_str()?;
-    let (cigar, _tag) = tag("cg:Z:")(cigar)?;
+    let cigar = rec.get_cigar_string()?;
+    let (cigar, _tag) = tag("cg:Z:")(cigar.as_str())?;
 
     // init a ChainDataLine filled 0
     let mut dataline = ChainDataLine {
@@ -525,8 +525,8 @@ pub fn parse_cigar_to_insert<T: AlignRecord>(
     q_seq: &mut String,
 ) -> Result<(), WGAError> {
     // get cigar bytes and tag
-    let cigar = rec.get_cigar_str()?;
-    let (cigar, _tag) = tag("cg:Z:")(cigar)?;
+    let cigar = rec.get_cigar_string()?;
+    let (cigar, _tag) = tag("cg:Z:")(cigar.as_str())?;
 
     // fold cigar bytes into many CigarUnits[#CigarUnit]
     let mut current_offset = 0;
@@ -648,8 +648,8 @@ pub fn parse_paf_to_cigar<T: AlignRecord>(rec: &T) -> Result<Cigar, WGAError> {
         }
     };
 
-    let cigar = rec.get_cigar_str()?;
-    let (cigar, _tag) = tag("cg:Z:")(cigar)?;
+    let cigar = rec.get_cigar_string()?;
+    let (cigar, _tag) = tag("cg:Z:")(cigar.as_str())?;
     let mut current_offset = 0;
     let (_, res) = fold_many1(
         parse_cigar_str_tuple,
@@ -918,8 +918,8 @@ pub fn parse_cigar_to_base_plotdata<T: AlignRecord>(
     rec: &T,
     skip_cutoff: usize,
 ) -> Result<Vec<BasePlotdata>, WGAError> {
-    let cigar = rec.get_cigar_str()?;
-    let (cigar, _tag) = tag("cg:Z:")(cigar)?;
+    let cigar = rec.get_cigar_string()?;
+    let (cigar, _tag) = tag("cg:Z:")(cigar.as_str())?;
     let ref_start = rec.target_start();
     let query_start = rec.query_start();
     let mut ref_current_offset = ref_start;

@@ -183,8 +183,8 @@ fn write_pmaf(
                 }
             }
             // modify query sequence by cigar
-            let cigar = rec.get_cigar_str()?;
-            gen_pesudo_maf_by_cigar(cigar, &mut q_seq, true_base)?;
+            let cigar = rec.get_cigar_string()?;
+            gen_pesudo_maf_by_cigar(&cigar, &mut q_seq, true_base)?;
             // write modified query sequence
             // trim head overlap len
             if overlap_len > 0 {
