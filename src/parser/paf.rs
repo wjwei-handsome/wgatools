@@ -2,6 +2,7 @@ use crate::errors::WGAError;
 use crate::parser::cigar::parse_paf_to_cigar;
 use crate::parser::common::{AlignRecord, RecStat, Strand};
 use csv::{DeserializeRecordsIter, ReaderBuilder};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io;
@@ -117,12 +118,24 @@ impl AlignRecord for PafRecord {
         Strand::Positive
     }
 
-    fn get_cigar_str(&self) -> Result<&str, WGAError> {
-        self.tags
-            .iter()
-            .find(|x| x.starts_with("cg:Z:"))
-            .ok_or(WGAError::CigarTagNotFound)
-            .map(|x| x.as_str())
+    fn get_cigar_string(&self) -> Result<String, WGAError> {
+        let cg_tag = self.tags.iter().find(|x| x.starts_with("cg:Z:"));
+        let cs_tag = self.tags.iter().find(|x| x.starts_with("cs:Z:"));
+
+        match cg_tag {
+            Some(cg) => Ok(cg.to_string()),
+            None => match cs_tag {
+                Some(cs) => {
+                    // remove the prefix cs:Z:
+                    let cs = &cs[5..];
+                    let mut cg_tag = cs_to_cigar(cs);
+                    // add cg:Z: prefix
+                    cg_tag.insert_str(0, "cg:Z:");
+                    Ok(cg_tag)
+                }
+                None => Err(WGAError::CigarTagNotFound),
+            },
+        }
     }
 
     fn target_align_size(&self) -> u64 {
@@ -135,4 +148,70 @@ impl AlignRecord for PafRecord {
         let cigar = parse_paf_to_cigar(self)?;
         Ok(RecStat::from(cigar))
     }
+}
+
+/// cstag is represented as :6-ata:10+gtc:4*at:3, where :[0-9]+ represents an identical block, -ata represents a deletion, +gtc an insertion and *at indicates reference base a is substituted with a query base t.
+/// cgtag : 6M3D10M3I4M1X3M
+///     let cs_tag = ":6-ata:10+gtc:4*at*tg:3";
+///     let cigar = cs_to_cigar(cs_tag);
+///     println!("{}", cigar);  // output: 6M3D10M3I4M2X3M
+fn cs_to_cigar(cs_tag: &str) -> String {
+    let re = Regex::new(r"(:[0-9]+|\*[a-z][a-z]|[=\+\-][A-Za-z]+)").unwrap();
+    let mut cigar = String::new();
+    let mut last_op = 'M';
+    let mut last_len = 0;
+
+    for cap in re.captures_iter(cs_tag) {
+        let part = &cap[0];
+        match &part[0..1] {
+            ":" => {
+                let length: usize = part[1..].parse().unwrap();
+                if last_op == 'M' {
+                    last_len += length;
+                } else {
+                    if last_len > 0 {
+                        cigar.push_str(&format!("{}{}", last_len, last_op));
+                    }
+                    last_op = 'M';
+                    last_len = length;
+                }
+            }
+            "-" => {
+                let length = part[1..].len();
+                if last_len > 0 {
+                    cigar.push_str(&format!("{}{}", last_len, last_op));
+                }
+                cigar.push_str(&format!("{}D", length));
+                last_len = 0;
+                last_op = 'M';
+            }
+            "+" => {
+                let length = part[1..].len();
+                if last_len > 0 {
+                    cigar.push_str(&format!("{}{}", last_len, last_op));
+                }
+                cigar.push_str(&format!("{}I", length));
+                last_len = 0;
+                last_op = 'M';
+            }
+            "*" => {
+                if last_op == 'X' {
+                    last_len += 1;
+                } else {
+                    if last_len > 0 {
+                        cigar.push_str(&format!("{}{}", last_len, last_op));
+                    }
+                    last_op = 'X';
+                    last_len = 1;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if last_len > 0 {
+        cigar.push_str(&format!("{}{}", last_len, last_op));
+    }
+
+    cigar
 }
