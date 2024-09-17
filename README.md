@@ -8,6 +8,37 @@
 
 ## A Rust library and tools for whole genome alignment files
 
+## Table of Contents
+
+- [Install](#install)
+  - [Conda](#conda)
+  - [Build from source](#build-from-source)
+  - [Nix](#nix)
+  - [Docker and Singularity](#docker-and-singularity)
+
+- [Tools](#tools)
+  - [Usage](#usage)
+  - [Auto-Completion for easy-use](#auto-completion-for-easy-use)
+  - [Format Conversion](#format-conversion)
+  - [Dotplot for MAF/PAF file](#dotplot-for-mafpaf-file)
+  - [Extract regions from MAF file](#extract-regions-from-maf-file)
+  - [View MAF file in terminal](#view-maf-file-in-terminal)
+  - [Call Variants from MAF file](#call-variants-from-maf-file)
+  - [Chunk MAF file by length](#chunk-maf-file-by-length)
+  - [Statistics for MAF/PAF file](#statistics-for-mafpaf-file)
+  - [Validate and fix PAF file](#validate-and-fix-paf-file)
+  - [Filter records for MAF/PAF file](#filter-records-for-mafpaf-file)
+  - [Rename MAF file](#rename-maf-file)
+  - [PAF Coverage for all-to-all alignment](#paf-coverage-for-all-to-all-alignment)
+  - [Generate pseudo MAF from all-to-all PAF](#generate-pseudo-maf-from-all-to-all-paf)
+
+- [Library](#library)
+- [Features](#features)
+- [Benchmark](#benchmark)
+- [Ciation](#citation)
+- [ROADMAP](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Install
 
@@ -67,7 +98,7 @@ singularity build wgatools-$(git log -1 --format=%h --abbrev=8).sif docker-daemo
 
 This can be useful when running on HPCs where it might be difficult to build wgatools.
 
-## TOOLS
+## Tools
 
 ### Usage
 
@@ -320,7 +351,7 @@ You can rename the sequence name in MAF file with a prefix:
 wgatools rename --prefixs REF.,QUERY. input.maf > rename.maf
 ```
 
-### [Experimental] PAF Coverage for all-to-all alignment
+### PAF Coverage for all-to-all alignment
 
 If you have alignment results for multiple genomes, you can use this command to calculate the alignment coverage on the genomes. It's optimized to use with [`wfmash`](https://github.com/waveygang/wfmash) output.
 
@@ -328,12 +359,15 @@ If you have alignment results for multiple genomes, you can use this command to 
 wgatools pafcov all.paf > all.cov.beds
 ```
 
-### [Experimental] Generate pseudo MAF from all-to-all PAF
+### Generate pseudo MAF from all-to-all PAF
 
 ```shell
 wgatools pafpseudo -f all.fa.gz all.paf -o out_dir -t 10
 ```
 ![pp](https://raw.githubusercontent.com/wjwei-handsome/wwjPic/main/img/20240321161004.png)
+
+> [!TIP]
+> Practical processes and profile can refer to this [pipleline](https://github.com/T2T-apes/ape_pangenome) and this [paper](https://www.biorxiv.org/content/10.1101/2024.07.31.605654v1.article-info)
 
 
 
@@ -375,13 +409,19 @@ command|mean(sec)|stddev|median|user|system|min|max
 wgatools p2c Zm-CML333.paf -o foo|3.69|0.36|3.71|3.46|0.14|3.25|4.09
 paf2chain --input Zm-CML333.paf > bar|16.28|0.86|16.27|3.80|12.03|15.01|17.67
 
+## Citation
+
+If you use `wgatools` in your research, please cite:
+
+[Wei W, Gui S, Yang J, Garrison E, Yan J, Liu HJ. wgatools: an ultrafast toolkit for manipulating whole genome alignments. Published online September 13, 2024. doi:10.48550/arXiv.2409.08569](https://doi.org/10.48550/arXiv.2409.08569)
+
 ## ROADMAP
 
-- [ ] SAM converter [really need?]
+- [ ] SAM converter
 - [ ] Local improvement of alignment by re-alignment
 - [ ] MAF -> GAF -> HAL
 - [ ] output gvcf for variants
-- [ ] call variants from PAF
+- [ ] call variants from PAF directly
 
 
 ## Contributing
