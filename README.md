@@ -10,6 +10,7 @@
 
 ## Table of Contents
 
+- [Ciation](#citation)
 - [Install](#install)
   - [Conda](#conda)
   - [Build from source](#build-from-source)
@@ -35,10 +36,15 @@
 - [Library](#library)
 - [Features](#features)
 - [Benchmark](#benchmark)
-- [Ciation](#citation)
 - [ROADMAP](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
+
+## Citation
+
+If you use `wgatools` in your research, please cite:
+
+[Wei W, Gui S, Yang J, Garrison E, Yan J, Liu HJ. wgatools: an ultrafast toolkit for manipulating whole genome alignments. Published online September 13, 2024. doi:10.48550/arXiv.2409.08569](https://doi.org/10.48550/arXiv.2409.08569)
 
 ## Install
 
@@ -409,11 +415,7 @@ command|mean(sec)|stddev|median|user|system|min|max
 wgatools p2c Zm-CML333.paf -o foo|3.69|0.36|3.71|3.46|0.14|3.25|4.09
 paf2chain --input Zm-CML333.paf > bar|16.28|0.86|16.27|3.80|12.03|15.01|17.67
 
-## Citation
 
-If you use `wgatools` in your research, please cite:
-
-[Wei W, Gui S, Yang J, Garrison E, Yan J, Liu HJ. wgatools: an ultrafast toolkit for manipulating whole genome alignments. Published online September 13, 2024. doi:10.48550/arXiv.2409.08569](https://doi.org/10.48550/arXiv.2409.08569)
 
 ## ROADMAP
 
