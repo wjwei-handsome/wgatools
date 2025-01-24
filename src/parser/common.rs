@@ -81,7 +81,7 @@ pub struct Block<'a> {
 }
 
 /// impl Default for Block
-impl<'a> Default for Block<'a> {
+impl Default for Block<'_> {
     fn default() -> Self {
         Block {
             query_name: "",

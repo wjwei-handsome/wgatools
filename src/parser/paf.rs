@@ -69,7 +69,7 @@ pub struct Records<'a, R: io::Read> {
 }
 
 /// impl Iterator for Records
-impl<'a, R: io::Read> Iterator for Records<'a, R> {
+impl<R: io::Read> Iterator for Records<'_, R> {
     type Item = csv::Result<PafRecord>;
     fn next(&mut self) -> Option<csv::Result<PafRecord>> {
         self.inner.next()

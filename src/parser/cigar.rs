@@ -113,10 +113,10 @@ fn null() -> Result<(), WGAError> {
 //     Ok(())
 // }
 
-/// Parse cigar string of a AlignRecord[PafRecord, SamRecord] which includes cg:Z: tag and
-/// write into a blocks file
-/// - For PafRecord: cigar should only contains 'M,I,D'
-/// - For SamRecord: cigar's first `[0-9]+H` should represent the query start
+// Parse cigar string of a AlignRecord[PafRecord, SamRecord] which includes cg:Z: tag and
+// write into a blocks file
+// - For PafRecord: cigar should only contains 'M,I,D'
+// - For SamRecord: cigar's first `[0-9]+H` should represent the query start
 // pub fn parse_cigar_to_blocks<T: AlignRecord>(
 //     rec: &T,
 //     wtr: &mut Writer<&mut dyn Write>,
@@ -307,9 +307,9 @@ pub fn cigar_cat_ext(c1: &char, c2: &char) -> char {
     }
 }
 
-/// cigar category method for caller if follow the MAF format
-/// AAA--GGG
-/// AAA--GGC
+// cigar category method for caller if follow the MAF format
+// AAA--GGG
+// AAA--GGC
 
 pub fn cigar_cat_ext_caller(c1: &char, c2: &char) -> char {
     if c1 == &'-' {
