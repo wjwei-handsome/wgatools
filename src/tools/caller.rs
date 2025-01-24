@@ -1,8 +1,10 @@
 use crate::errors::WGAError;
-use crate::parser::cigar::cigar_cat_ext_caller;
+use crate::parser::cigar::{cigar_cat_ext_caller, parse_cigar_to_insert};
 use crate::parser::common::{AlignRecord, Strand};
-use crate::parser::maf::{MAFReader, MAFRecord};
+use crate::parser::maf::{MAFReader, MAFRecord, MAFSLine};
+use crate::parser::paf::PAFReader;
 use crate::tools::index::MafIndex;
+use crate::utils::reverse_complement;
 use itertools::Itertools;
 use noodles::vcf;
 use noodles::vcf::{
@@ -20,15 +22,15 @@ use noodles::vcf::{
 };
 use rayon::iter::ParallelIterator;
 use rayon::prelude::*;
+use rust_htslib::faidx;
 use std::io::{Read, Write};
 
-///
-///A example:
-///
-/// ACGATGCTAGCT---ACG
-/// AC--TGCTAACTGGGACG
-/// within alignment: snp | ins | del | tandem expansion | tandem contraction | Repeat expansion | Repeat contraction
-/// between alignment: INS | DEL | Repeat expansion | Repeat contraction
+// A example:
+//
+// ACGATGCTAGCT---ACG
+// AC--TGCTAACTGGGACG
+// within alignment: snp | ins | del | tandem expansion | tandem contraction | Repeat expansion | Repeat contraction
+// between alignment: INS | DEL | Repeat expansion | Repeat contraction
 
 // main function, it return a Result<(), WGAErr>
 // NOTE: but other functions took anyhow, bucause noodles::vcf's error' organization is too complex
@@ -71,6 +73,122 @@ pub fn call_var_maf<R: Read + Send>(
     for rec in within_var_recs {
         vcf_wtr.write_record(&header, &rec)?;
     }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn call_var_paf<R: Read + Send>(
+    pafreader: &mut PAFReader<R>,
+    t_fa_path: &str,
+    q_fa_path: &str,
+    writer: &mut dyn Write,
+    if_snp: bool,
+    svlen_cutoff: u64,
+    _between: bool,
+    sample: Option<&str>,
+) -> Result<(), WGAError> {
+    let mut vcf_wtr = vcf::Writer::new(writer);
+    let sample = sample.unwrap_or("sample");
+    let mut header = build_header(sample)?;
+
+    // collect all PAF records
+    let pafrecords = pafreader
+        .records()
+        .par_bridge()
+        .collect::<Result<Vec<_>, _>>()?;
+
+    // get FASTA readers
+    let t_reader = faidx::Reader::from_path(t_fa_path)?;
+    let q_reader = faidx::Reader::from_path(q_fa_path)?;
+
+    // map PAF records to MAF records
+    let maf_records = pafrecords
+        .iter()
+        .map(|pafrec| {
+            // get target information
+            let t_name = &pafrec.target_name;
+            let t_start = pafrec.target_start;
+            let t_end = pafrec.target_end - 1;
+            let t_strand = pafrec.target_strand();
+            let t_alilen = pafrec.target_end - pafrec.target_start;
+            let t_size = pafrec.target_length;
+
+            // get query information
+            let q_name = &pafrec.query_name;
+            let q_strand = pafrec.query_strand();
+            let q_size = pafrec.query_length;
+            let q_alilen = pafrec.query_end - pafrec.query_start;
+            let q_start = match q_strand {
+                Strand::Positive => pafrec.query_start,
+                Strand::Negative => q_size - pafrec.query_end,
+            };
+
+            // get whole target and query sequence
+            let mut whole_t_seq =
+                t_reader.fetch_seq_string(t_name, t_start as usize, t_end as usize)?;
+            let mut whole_q_seq = q_reader.fetch_seq_string(
+                q_name,
+                pafrec.query_start as usize,
+                (pafrec.query_end - 1) as usize,
+            )?;
+
+            // reverse complement query sequence if it is negative strand
+            if q_strand == Strand::Negative {
+                whole_q_seq = reverse_complement(&whole_q_seq)?;
+            }
+
+            // parse CIGAR to insertions
+            parse_cigar_to_insert(pafrec, &mut whole_t_seq, &mut whole_q_seq)?;
+
+            // build MAF SLine
+            let t_sline = MAFSLine {
+                mode: 's',
+                name: t_name.to_string(),
+                start: t_start,
+                align_size: t_alilen,
+                strand: t_strand,
+                size: t_size,
+                seq: whole_t_seq,
+            };
+
+            let q_sline = MAFSLine {
+                mode: 's',
+                name: q_name.to_string(),
+                start: q_start,
+                align_size: q_alilen,
+                strand: q_strand,
+                size: q_size,
+                seq: whole_q_seq,
+            };
+
+            // build MAF record
+            Ok(MAFRecord {
+                score: pafrec.mapq,
+                slines: vec![t_sline, q_sline],
+            })
+        })
+        .collect::<Result<Vec<_>, WGAError>>()?;
+
+    // lazy use, TODO refine it
+    let within_var_recs = maf_records
+        .par_iter()
+        .try_fold(Vec::new, |mut acc, rec| {
+            let var_recs = call_within_var(rec, if_snp, svlen_cutoff)?;
+            acc.extend(var_recs);
+            Ok::<Vec<Record>, WGAError>(acc)
+        })
+        .try_reduce(Vec::new, |mut acc, mut vec| {
+            acc.append(&mut vec);
+            Ok(acc)
+        })?;
+
+    // write VCF
+    add_header_contig(None, &mut header)?;
+    vcf_wtr.write_header(&header)?;
+    for rec in within_var_recs {
+        vcf_wtr.write_record(&header, &rec)?;
+    }
+
     Ok(())
 }
 

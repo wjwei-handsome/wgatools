@@ -274,6 +274,12 @@ The default parameter does not output `SNP` and short `INS` and `DEL` (<50). The
 wgatools call test/test.maf -s -l0
 ```
 
+or directly use PAF file with target and query sequence:
+
+```shell
+wgatools call test/test.paf -s -l0 --target target.fa --query query.fa -f paf
+```
+
 Output vcf:
 ```
 ##fileformat=VCFv4.4

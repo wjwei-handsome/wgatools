@@ -2,12 +2,13 @@ use log::{error, info};
 use wgalib::cli::{make_cli_parse, Commands};
 use wgalib::errors::WGAError;
 use wgalib::log::init_logger;
+use wgalib::parser::common::FileFormat;
 use wgalib::tools::tview::tview;
 use wgalib::utils::{
     wrap_build_index, wrap_chain2maf, wrap_chain2paf, wrap_chunk, wrap_dotplot, wrap_filter,
     wrap_gencomp, wrap_maf2chain, wrap_maf2paf, wrap_maf2sam, wrap_maf_call, wrap_maf_extract,
-    wrap_paf2chain, wrap_paf2maf, wrap_paf_cov, wrap_paf_pesudo_maf, wrap_rename_maf, wrap_stat,
-    wrap_validate,
+    wrap_paf2chain, wrap_paf2maf, wrap_paf_call, wrap_paf_cov, wrap_paf_pesudo_maf,
+    wrap_rename_maf, wrap_stat, wrap_validate,
 };
 
 fn main() {
@@ -75,17 +76,46 @@ fn main_entry() -> Result<(), WGAError> {
             sample,
             snp,
             svlen,
-        } => {
-            wrap_maf_call(
-                input,
-                &outfile,
-                rewrite,
-                *snp,
-                *svlen,
-                false,
-                sample.as_deref(),
-            )?;
-        }
+            format,
+            target,
+            query,
+        } => match format {
+            FileFormat::Maf => {
+                wrap_maf_call(
+                    input,
+                    &outfile,
+                    rewrite,
+                    *snp,
+                    *svlen,
+                    false,
+                    sample.as_deref(),
+                )?;
+            }
+            FileFormat::Paf => {
+                let (target, query) = match (target, query) {
+                    (Some(t), Some(q)) => (t, q),
+                    _ => {
+                        return Err(WGAError::Other(anyhow::anyhow!(
+                            "target and query are necessary"
+                        )));
+                    }
+                };
+                wrap_paf_call(
+                    input,
+                    target,
+                    query,
+                    &outfile,
+                    rewrite,
+                    *snp,
+                    *svlen,
+                    true,
+                    sample.as_deref(),
+                )?;
+            }
+            _ => {
+                return Err(WGAError::Other(anyhow::anyhow!("format is not supported")));
+            }
+        },
         Commands::Maf2Sam { input } => {
             wrap_maf2sam(input, &outfile, rewrite)?;
         }

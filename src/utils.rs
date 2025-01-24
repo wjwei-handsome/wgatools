@@ -9,7 +9,7 @@ use crate::{
         paf::PAFReader,
     },
     tools::{
-        caller::call_var_maf,
+        caller::{call_var_maf, call_var_paf},
         chunk::chunk_maf,
         dotplot::dotplot,
         filter::{filter_chain, filter_maf, filter_paf, filter_paf_align_pair},
@@ -424,6 +424,60 @@ pub fn wrap_maf_call(
     call_var_maf(
         &mut mafreader,
         mafindex,
+        &mut writer,
+        snp,
+        svlen,
+        between,
+        sample,
+    )?;
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+/// Command: paf call
+pub fn wrap_paf_call(
+    input: &Option<String>,
+    t_fa_path: &str,
+    q_fa_path: &str,
+    output: &str,
+    rewrite: bool,
+    snp: bool,
+    svlen: u64,
+    between: bool,
+    sample: Option<&str>,
+) -> Result<(), WGAError> {
+    // prepare reader and writer
+    let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
+
+    // check if fasta files exist
+    if !Path::new(t_fa_path).exists() {
+        return Err(WGAError::FileNotExist(PathBuf::from(t_fa_path)));
+    }
+    if !Path::new(q_fa_path).exists() {
+        return Err(WGAError::FileNotExist(PathBuf::from(q_fa_path)));
+    }
+
+    // check if fasta index files exist, if not create them
+    if !Path::new(&format!("{}.fai", t_fa_path)).exists() {
+        return Err(WGAError::FileNotExist(PathBuf::from(format!(
+            "{}.fai",
+            t_fa_path
+        ))));
+    }
+    if !Path::new(&format!("{}.fai", q_fa_path)).exists() {
+        return Err(WGAError::FileNotExist(PathBuf::from(format!(
+            "{}.fai",
+            q_fa_path
+        ))));
+    }
+
+    // initialize PAF reader
+    let mut pafreader = PAFReader::new(reader);
+
+    call_var_paf(
+        &mut pafreader,
+        t_fa_path,
+        q_fa_path,
         &mut writer,
         snp,
         svlen,

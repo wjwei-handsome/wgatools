@@ -120,10 +120,10 @@ pub enum Commands {
         #[arg(required = true, long, short = 'l')]
         length: u64,
     },
-    /// Call Variants from MAF file
+    /// Call Variants from MAF/PAF file
     #[command(visible_alias = "c", name = "call")]
     Call {
-        /// Input MAF File
+        /// Input MAF/PAF File
         #[arg(required = false)]
         input: Option<String>,
         /// Sample name
@@ -140,6 +140,14 @@ pub enum Commands {
         /// SV length cutoff
         #[arg(required = false, long = "svlen", short = 'l', default_value = "50")]
         svlen: u64,
+        #[arg(required = false, long, short, default_value = "maf")]
+        format: FileFormat,
+        /// Input target FASTA File, required if input is PAF
+        #[arg(required = false, long, short)]
+        target: Option<String>,
+        /// Input query FASTA File, required if input is PAF
+        #[arg(required = false, long, short)]
+        query: Option<String>,
     },
     /// View MAF file in terminal
     #[command(visible_alias = "tv", name = "tview")]
