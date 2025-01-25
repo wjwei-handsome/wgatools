@@ -104,6 +104,21 @@ singularity build wgatools-$(git log -1 --format=%h --abbrev=8).sif docker-daemo
 
 This can be useful when running on HPCs where it might be difficult to build wgatools.
 
+### Guix
+
+Clone wgatools repo and create a Guix shell to build and hack on wgatools:
+
+```
+cd wgatools
+guix shell --share=/home/wrk/.cargo -C -D -N rust rust-cargo openssl nss-certs nss coreutils-minimal which perl make binutils gcc-toolchain pkg-config cmake zlib
+env LD_LIBRARY_PATH=$GUIX_ENVIRONMENT/lib CC=gcc cargo build
+```
+
+The `--share` switch prevents redownloading cargo packages. `-C -D` defines a build container that is independent of the underlying
+Linux distribution. `-N` gives network access to the guix shell and `-F` provides the Linux file system hierarchy standard (FHS).
+
+Note that `cargo build --release` build does not work (yet). There is some problem with cargo+ctest+static builds.
+
 ## Tools
 
 ### Usage
