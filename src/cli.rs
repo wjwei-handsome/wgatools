@@ -143,7 +143,7 @@ pub enum Commands {
         #[arg(required = false, long, short, default_value = "maf")]
         format: FileFormat,
         /// Input target FASTA File, required if input is PAF
-        #[arg(required = false, long, short)]
+        #[arg(required = false, long)]
         target: Option<String>,
         /// Input query FASTA File, required if input is PAF
         #[arg(required = false, long, short)]
