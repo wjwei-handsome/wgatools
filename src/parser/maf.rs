@@ -245,10 +245,11 @@ impl MAFRecord {
 
     pub fn set_query_idx_byname(&mut self, query_name: &str) -> Result<(), WGAError> {
         match self.get_query_idx_byname(query_name) {
-            Some(idx) => Ok(self.query_idx = idx),
-            None => {
-                return Err(WGAError::QueryNameNotFound(query_name.to_string()));
+            Some(idx) => {
+                self.query_idx = idx;
+                Ok(())
             }
+            None => Err(WGAError::QueryNameNotFound(query_name.to_string())),
         }
     }
 

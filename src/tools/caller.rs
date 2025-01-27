@@ -35,6 +35,7 @@ use std::io::{Read, Write};
 // main function, it return a Result<(), WGAErr>
 // NOTE: but other functions took anyhow, bucause noodles::vcf's error' organization is too complex
 // and it will not be error in 99.9% cases
+#[allow(clippy::too_many_arguments)]
 pub fn call_var_maf<R: Read + Send>(
     mafreader: &mut MAFReader<R>,
     mafindex: Option<MafIndex>,

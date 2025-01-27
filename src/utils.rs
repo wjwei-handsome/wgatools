@@ -383,6 +383,7 @@ pub fn wrap_maf_extract(
 }
 
 /// Command: maf call
+#[allow(clippy::too_many_arguments)]
 pub fn wrap_maf_call(
     input: &Option<String>,
     output: &str,
