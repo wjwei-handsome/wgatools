@@ -427,7 +427,7 @@ impl AlignRecord for ChainRecord {
         self.header.target.end - self.header.target.start
     }
 
-    fn convert2paf(&self) -> Result<PafRecord, WGAError> {
+    fn convert2paf(&mut self, _query_name: Option<&str>) -> Result<PafRecord, WGAError> {
         let cigar = parse_chain_to_cigar(self, false);
         let cigar_string = cigar.cigar_string;
         let block_length =

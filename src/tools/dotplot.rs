@@ -149,6 +149,7 @@ pub struct BasePlotdata {
     pub query_chro: String,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn dotplot(
     reader: Box<dyn BufRead + Send>,
     writer: &mut dyn Write,
@@ -157,6 +158,7 @@ pub fn dotplot(
     mode: DotplotMode,
     no_identity: bool,
     skip_cutoff: usize,
+    query_name: Option<&str>,
 ) -> Result<(), WGAError> {
     // init vega spec
     let mut vega_spec: Value = serde_json::from_str(DOTPLOT_SPEC)?;
@@ -165,7 +167,9 @@ pub fn dotplot(
     match mode {
         DotplotMode::Overview => {
             let pair_stat_vec = match format {
-                FileFormat::Maf => generate_maf_data(MAFReader::new(reader)?, no_identity)?,
+                FileFormat::Maf => {
+                    generate_maf_data(MAFReader::new(reader)?, no_identity, query_name)?
+                }
                 FileFormat::Paf => generate_paf_data(PAFReader::new(reader), no_identity)?,
                 _ => {
                     return Err(WGAError::Other(anyhow::anyhow!(
@@ -177,7 +181,9 @@ pub fn dotplot(
         }
         DotplotMode::BaseLevel => {
             let pair_base_plot_vec = match format {
-                FileFormat::Maf => generate_maf_basedata(MAFReader::new(reader)?, skip_cutoff)?,
+                FileFormat::Maf => {
+                    generate_maf_basedata(MAFReader::new(reader)?, skip_cutoff, query_name)?
+                }
                 FileFormat::Paf => generate_paf_basedata(PAFReader::new(reader), skip_cutoff)?,
                 _ => {
                     return Err(WGAError::Other(anyhow::anyhow!(
@@ -240,12 +246,17 @@ fn render_output<S: Serialize>(
 fn generate_maf_data<R: Read + Send>(
     mut reader: MAFReader<R>,
     no_identity: bool,
+    query_name: Option<&str>,
 ) -> Result<Vec<AllPlotdata>, WGAError> {
     let pair_stat_vec = reader
         .records()
         .par_bridge()
         .try_fold(Vec::new, |mut acc, rec| {
-            acc.push(rec_dot_data(&rec?, no_identity)?);
+            let mut rec = rec?;
+            if let Some(qname) = query_name {
+                rec.set_query_idx_byname(qname)?;
+            }
+            acc.push(rec_dot_data(&rec, no_identity)?);
             Ok::<Vec<AllPlotdata>, WGAError>(acc)
         })
         .try_reduce(Vec::new, |mut acc, mut vec| {
@@ -298,12 +309,17 @@ fn generate_paf_basedata<R: Read + Send>(
 fn generate_maf_basedata<R: Read + Send>(
     mut reader: MAFReader<R>,
     cutoff: usize,
+    query_name: Option<&str>,
 ) -> Result<Vec<Vec<BasePlotdata>>, WGAError> {
     let pair_stat_vec = reader
         .records()
         .par_bridge()
         .try_fold(Vec::new, |mut acc, rec| {
-            acc.push(parse_maf_to_base_plotdata(&rec?, cutoff)?);
+            let mut rec = rec?;
+            if let Some(qname) = query_name {
+                rec.set_query_idx_byname(qname)?;
+            }
+            acc.push(parse_maf_to_base_plotdata(&rec, cutoff)?);
             Ok::<Vec<Vec<BasePlotdata>>, WGAError>(acc)
         })
         .try_reduce(Vec::new, |mut acc, mut vec| {

@@ -29,6 +29,7 @@ use std::num::NonZeroUsize;
 pub fn maf2paf<R: Read + Send>(
     mafreader: &mut MAFReader<R>,
     writer: &mut dyn Write,
+    query_name: Option<&str>,
 ) -> Result<(), WGAError> {
     // init csv writer for deserializing
     let mut wtr = csv::WriterBuilder::new()
@@ -41,8 +42,8 @@ pub fn maf2paf<R: Read + Send>(
         .records()
         .par_bridge()
         .map(|record| -> Result<_, WGAError> {
-            let mafrecord = record?;
-            mafrecord.convert2paf()
+            let mut mafrecord = record?;
+            mafrecord.convert2paf(query_name)
         })
         .collect::<Result<Vec<_>, WGAError>>()?;
     for pafrec in pafrecords {
@@ -56,10 +57,20 @@ pub fn maf2paf<R: Read + Send>(
 pub fn maf2chain<R: Read + Send>(
     mafreader: &mut MAFReader<R>,
     writer: &mut Box<dyn Write>,
+    query_name: Option<&str>,
 ) -> Result<(), WGAError> {
     // iterate over records and give a self-increasing chain-id
     for (id, record) in mafreader.records().enumerate() {
-        let record = record?;
+        let mut record = record?;
+
+        match query_name {
+            Some(qname) => {
+                record.set_query_idx_byname(qname)?;
+            }
+            None => {
+                // do nothing
+            }
+        }
 
         // transform record to Chain Header
         let mut header = ChainHeader::try_from(&record)?;
@@ -392,8 +403,8 @@ pub fn chain2paf<R: Read + Send>(
         .records()?
         .par_bridge()
         .map(|record| -> Result<_, WGAError> {
-            let chainrecord = record?;
-            chainrecord.convert2paf()
+            let mut chainrecord = record?;
+            chainrecord.convert2paf(None)
         })
         .collect::<Result<Vec<_>, WGAError>>()?;
     // if we should sort pafrecords?

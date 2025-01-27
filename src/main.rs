@@ -38,8 +38,8 @@ fn main_entry() -> Result<(), WGAError> {
     info!("Command: {:?}", &cli.command);
 
     match &cli.command {
-        Commands::Maf2Paf { input } => {
-            wrap_maf2paf(input, &outfile, rewrite)?;
+        Commands::Maf2Paf { input, query_name } => {
+            wrap_maf2paf(input, &outfile, query_name.clone(), rewrite)?;
         }
         Commands::Paf2Maf {
             input,
@@ -61,8 +61,8 @@ fn main_entry() -> Result<(), WGAError> {
         } => {
             wrap_chain2maf(input, &outfile, target, query, rewrite)?;
         }
-        Commands::Maf2Chain { input } => {
-            wrap_maf2chain(input, &outfile, rewrite)?;
+        Commands::Maf2Chain { input, query_name } => {
+            wrap_maf2chain(input, &outfile, rewrite, query_name.clone())?;
         }
         Commands::MafExtract {
             input,
@@ -131,7 +131,8 @@ fn main_entry() -> Result<(), WGAError> {
             input,
             format,
             each,
-        } => wrap_stat(*format, input, &outfile, rewrite, *each)?,
+            query_name,
+        } => wrap_stat(*format, input, &outfile, query_name.clone(), rewrite, *each)?,
         Commands::Dotplot {
             input,
             format,
@@ -139,6 +140,7 @@ fn main_entry() -> Result<(), WGAError> {
             no_identity,
             length,
             mode,
+            query_name,
         } => {
             wrap_dotplot(
                 input,
@@ -148,6 +150,7 @@ fn main_entry() -> Result<(), WGAError> {
                 *no_identity,
                 *length,
                 &outfile,
+                query_name.clone(),
                 rewrite,
             )?;
         }

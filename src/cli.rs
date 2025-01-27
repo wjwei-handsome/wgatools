@@ -42,6 +42,9 @@ pub enum Commands {
         /// Input MAF File, None for STDIN
         #[arg(required = false)]
         input: Option<String>,
+        /// Query name when multiple query in MAF, None for first query
+        #[arg(required = false, short, long)]
+        query_name: Option<String>,
     },
     /// Convert MAF format to Chain format
     #[command(visible_alias = "m2c", name = "maf2chain")]
@@ -49,6 +52,9 @@ pub enum Commands {
         /// Input MAF File, None for STDIN
         #[arg(required = false)]
         input: Option<String>,
+        /// Query name when multiple query in MAF, None for first query
+        #[arg(required = false, short, long)]
+        query_name: Option<String>,
     },
     /// Convert PAF format to MAF format
     #[command(visible_alias = "p2m", name = "paf2maf")]
@@ -174,6 +180,9 @@ pub enum Commands {
         /// Show each block's statistics, default: false
         #[arg(required = false, long, short, default_value = "false")]
         each: bool,
+        /// Query name when multiple query in MAF, None for first query
+        #[arg(required = false, short, long)]
+        query_name: Option<String>,
     },
     /// Plot dotplot for Alignment file
     #[command(visible_alias = "dp", name = "dotplot")]
@@ -196,6 +205,9 @@ pub enum Commands {
         /// Skip segment with length less than cutoff in BaseLevel mode, default: 0
         #[arg(required = false, long, short = 'l')]
         length: Option<usize>,
+        /// Query name when multiple query in MAF, None for first query
+        #[arg(required = false, short, long)]
+        query_name: Option<String>,
     },
     /// Filter records for Alignment file
     #[command(visible_alias = "fl", name = "filter")]

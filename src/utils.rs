@@ -245,20 +245,30 @@ fn check_outfile(output_file: &str, rewrite: bool) -> Result<(), WGAError> {
 }
 
 /// Command: maf2paf
-pub fn wrap_maf2paf(input: &Option<String>, output: &str, rewrite: bool) -> Result<(), WGAError> {
+pub fn wrap_maf2paf(
+    input: &Option<String>,
+    output: &str,
+    query_name: Option<String>,
+    rewrite: bool,
+) -> Result<(), WGAError> {
     // prepare reader and writer
     let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
     let mut mafrdr = MAFReader::new(reader)?;
-    maf2paf(&mut mafrdr, &mut writer)?;
+    maf2paf(&mut mafrdr, &mut writer, query_name.as_deref())?;
     Ok(())
 }
 
 /// Command: maf2chain
-pub fn wrap_maf2chain(input: &Option<String>, output: &str, rewrite: bool) -> Result<(), WGAError> {
+pub fn wrap_maf2chain(
+    input: &Option<String>,
+    output: &str,
+    rewrite: bool,
+    query_name: Option<String>,
+) -> Result<(), WGAError> {
     // prepare reader and writer
     let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
     let mut mafrdr = MAFReader::new(reader)?;
-    maf2chain(&mut mafrdr, &mut writer)?;
+    maf2chain(&mut mafrdr, &mut writer, query_name.as_deref())?;
     Ok(())
 }
 
@@ -495,6 +505,7 @@ pub fn wrap_stat(
     format: FileFormat,
     input: &Option<String>,
     output: &str,
+    query_name: Option<String>,
     rewrite: bool,
     each: bool,
 ) -> Result<(), WGAError> {
@@ -505,7 +516,7 @@ pub fn wrap_stat(
     match format {
         FileFormat::Maf => {
             let mafrdr = MAFReader::new(reader)?;
-            stat_maf(mafrdr, &mut writer, each)?
+            stat_maf(mafrdr, &mut writer, each, query_name.as_deref())?
         }
         FileFormat::Paf => {
             let pafrdr = PAFReader::new(reader);
@@ -668,6 +679,7 @@ pub fn wrap_dotplot(
     no_identity: bool,
     cutoff: Option<usize>,
     output: &str,
+    query_name: Option<String>,
     rewrite: bool,
 ) -> Result<(), WGAError> {
     // prepare reader and writer
@@ -697,6 +709,7 @@ pub fn wrap_dotplot(
         mode,
         no_identity,
         cutoff,
+        query_name.as_deref(),
     )?;
     Ok(())
 }

@@ -157,7 +157,7 @@ pub trait AlignRecord {
     // fn get_cigar_string(&self) -> String {
     //     "*".to_string()
     // }
-    fn convert2paf(&self) -> Result<PafRecord, WGAError> {
+    fn convert2paf(&mut self, _query_name: Option<&str>) -> Result<PafRecord, WGAError> {
         Ok(PafRecord::default())
     }
     fn convert2maf(&self) -> Result<MAFRecord, WGAError> {

@@ -440,7 +440,15 @@ impl AlignRecord for MAFRecord {
         Ok(parse_maf_seq_to_cigar(self, false).cigar_string)
     }
 
-    fn convert2paf(&self) -> Result<PafRecord, WGAError> {
+    fn convert2paf(&mut self, query_name: Option<&str>) -> Result<PafRecord, WGAError> {
+        match query_name {
+            Some(qname) => {
+                self.set_query_idx_byname(qname)?;
+            }
+            None => {
+                // do nothing
+            }
+        }
         let cigar = parse_maf_seq_to_cigar(self, false);
         let cigar_string = String::from("cg:Z:") + &cigar.cigar_string;
         let matches = cigar.match_count as u64;

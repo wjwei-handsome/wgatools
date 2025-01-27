@@ -62,12 +62,17 @@ pub fn stat_maf<R: Read + Send>(
     mut reader: MAFReader<R>,
     writer: &mut dyn Write,
     each: bool,
+    query_name: Option<&str>,
 ) -> Result<(), WGAError> {
     let pair_stat_vec = reader
         .records()
         .par_bridge()
-        .try_fold(Vec::new, |mut acc, rec| {
-            acc.push(stat_rec(&rec?)?);
+        .try_fold(Vec::new, |mut acc, result_rec| {
+            let mut rec = result_rec?;
+            if let Some(qname) = query_name {
+                rec.set_query_idx_byname(qname)?;
+            }
+            acc.push(stat_rec(&rec)?);
             Ok::<Vec<PairStat>, WGAError>(acc)
         })
         .try_reduce(Vec::new, |mut acc, mut vec| {
