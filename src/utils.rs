@@ -391,6 +391,7 @@ pub fn wrap_maf_call(
     svlen: u64,
     between: bool,
     sample: Option<&str>,
+    query_name: Option<&str>,
 ) -> Result<(), WGAError> {
     // prepare reader and writer
     let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
@@ -429,6 +430,7 @@ pub fn wrap_maf_call(
         svlen,
         between,
         sample,
+        query_name,
     )?;
     Ok(())
 }

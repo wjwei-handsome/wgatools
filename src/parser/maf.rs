@@ -191,6 +191,7 @@ fn parse_sline(line: String) -> Result<MAFSLine, WGAError> {
 pub struct MAFRecord {
     pub score: u64,
     pub slines: Vec<MAFSLine>,
+    pub query_idx: usize,
 }
 
 impl MAFRecord {
@@ -233,6 +234,55 @@ impl MAFRecord {
         }
         Ok(())
     }
+
+    pub fn get_query_idx_byname(&self, query_name: &str) -> Option<usize> {
+        self.slines.iter().position(|x| x.name == query_name)
+    }
+
+    pub fn set_query_idx(&mut self, query_idx: usize) {
+        self.query_idx = query_idx;
+    }
+
+    pub fn set_query_idx_byname(&mut self, query_name: &str) -> Result<(), WGAError> {
+        match self.get_query_idx_byname(query_name) {
+            Some(idx) => Ok(self.query_idx = idx),
+            None => {
+                return Err(WGAError::QueryNameNotFound(query_name.to_string()));
+            }
+        }
+    }
+
+    // pub fn query_name_idx(&self, idx: usize) -> &str {
+    //     self.slines[idx].name.as_str()
+    // }
+
+    // pub fn query_length_idx(&self, idx: usize) -> u64 {
+    //     self.slines[idx].size
+    // }
+
+    // pub fn query_strand_idx(&self, idx: usize) -> Strand {
+    //     self.slines[idx].strand
+    // }
+
+    // pub fn query_start_idx(&self, idx: usize) -> u64 {
+    //     match self.query_strand_idx(idx) {
+    //         Strand::Positive => self.slines[idx].start,
+    //         Strand::Negative => {
+    //             self.slines[idx].size - self.slines[idx].start - self.slines[idx].align_size
+    //         }
+    //     }
+    // }
+
+    // pub fn query_end_idx(&self, idx: usize) -> u64 {
+    //     match self.query_strand_idx(idx) {
+    //         Strand::Positive => self.slines[idx].start + self.slines[idx].align_size,
+    //         Strand::Negative => self.slines[idx].size - self.slines[idx].start,
+    //     }
+    // }
+
+    // pub fn query_seq_idx(&self, idx: usize) -> &str {
+    //     &self.slines[idx].seq
+    // }
 }
 
 // impl PartialEq for MAFRecord
@@ -264,6 +314,7 @@ impl Default for MAFRecord {
         MAFRecord {
             score: 255,
             slines: Vec::new(),
+            query_idx: 1,
         }
     }
 }
@@ -290,6 +341,7 @@ impl<R: Read + Send> Iterator for MAFRecords<'_, R> {
                     let mut mafrecord = MAFRecord {
                         score,
                         slines: Vec::new(),
+                        query_idx: 1,
                     };
                     let sline = match parse_sline(line) {
                         Ok(sline) => sline,
@@ -329,32 +381,34 @@ impl<R: Read + Send> Iterator for MAFRecords<'_, R> {
 /// impl AlignRecord Trait for PafRecord
 impl AlignRecord for MAFRecord {
     fn query_name(&self) -> &str {
-        self.slines[1].name.as_str()
+        self.slines[self.query_idx].name.as_str()
     }
 
     fn query_length(&self) -> u64 {
-        self.slines[1].size
+        self.slines[self.query_idx].size
     }
 
     fn query_start(&self) -> u64 {
         // self.slines[1].start
+        let i = self.query_idx;
         match self.query_strand() {
-            Strand::Positive => self.slines[1].start,
+            Strand::Positive => self.slines[i].start,
             Strand::Negative => {
-                self.slines[1].size - self.slines[1].start - self.slines[1].align_size
+                self.slines[i].size - self.slines[i].start - self.slines[i].align_size
             }
         }
     }
 
     fn query_end(&self) -> u64 {
+        let i = self.query_idx;
         match self.query_strand() {
-            Strand::Positive => self.slines[1].start + self.slines[1].align_size,
-            Strand::Negative => self.slines[1].size - self.slines[1].start,
+            Strand::Positive => self.slines[i].start + self.slines[i].align_size,
+            Strand::Negative => self.slines[i].size - self.slines[i].start,
         }
     }
 
     fn query_strand(&self) -> Strand {
-        self.slines[1].strand
+        self.slines[self.query_idx].strand
     }
 
     fn target_name(&self) -> &str {
@@ -416,7 +470,7 @@ impl AlignRecord for MAFRecord {
     }
 
     fn query_seq(&self) -> &str {
-        &self.slines[1].seq
+        &self.slines[self.query_idx].seq
     }
 
     fn target_seq(&self) -> &str {

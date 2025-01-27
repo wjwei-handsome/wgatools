@@ -245,6 +245,7 @@ pub fn paf2maf<R: Read + Send>(
         let mafrec = MAFRecord {
             score,
             slines: vec![t_sline, q_sline],
+            query_idx: 1,
         };
         // write maf record
         mafwtr.write_record(&mafrec)?;
@@ -336,6 +337,7 @@ pub fn chain2maf<R: Read + Send>(
         let mafrec = MAFRecord {
             score,
             slines: vec![t_sline, q_sline],
+            query_idx: 1,
         };
         // write maf record
         mafwtr.write_record(&mafrec)?;

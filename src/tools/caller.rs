@@ -43,6 +43,7 @@ pub fn call_var_maf<R: Read + Send>(
     svlen_cutoff: u64,
     _between: bool,
     sample: Option<&str>,
+    query_name: Option<&str>,
 ) -> Result<(), WGAError> {
     let mut vcf_wtr = vcf::Writer::new(writer);
     let sample = sample.unwrap_or("sample");
@@ -55,9 +56,9 @@ pub fn call_var_maf<R: Read + Send>(
     // if sort
     mafrecords.sort();
     let within_var_recs = mafrecords
-        .par_iter()
+        .par_iter_mut()
         .try_fold(Vec::new, |mut acc, rec| {
-            let var_recs = call_within_var(rec, if_snp, svlen_cutoff)?;
+            let var_recs = call_within_var(rec, if_snp, svlen_cutoff, query_name)?;
             acc.extend(var_recs);
             Ok::<Vec<Record>, WGAError>(acc)
         })
@@ -102,7 +103,7 @@ pub fn call_var_paf<R: Read + Send>(
     let q_reader = faidx::Reader::from_path(q_fa_path)?;
 
     // map PAF records to MAF records
-    let maf_records = pafrecords
+    let mut maf_records = pafrecords
         .iter()
         .map(|pafrec| {
             // get target information
@@ -165,15 +166,16 @@ pub fn call_var_paf<R: Read + Send>(
             Ok(MAFRecord {
                 score: pafrec.mapq,
                 slines: vec![t_sline, q_sline],
+                query_idx: 1,
             })
         })
         .collect::<Result<Vec<_>, WGAError>>()?;
 
     // lazy use, TODO refine it
     let within_var_recs = maf_records
-        .par_iter()
+        .par_iter_mut()
         .try_fold(Vec::new, |mut acc, rec| {
-            let var_recs = call_within_var(rec, if_snp, svlen_cutoff)?;
+            let var_recs = call_within_var(rec, if_snp, svlen_cutoff, None)?;
             acc.extend(var_recs);
             Ok::<Vec<Record>, WGAError>(acc)
         })
@@ -277,12 +279,18 @@ fn get_variant_rec(
 }
 
 fn call_within_var(
-    mafrec: &MAFRecord,
+    mafrec: &mut MAFRecord,
     if_snp: bool,
     svlen_cutoff: u64,
+    query_name: Option<&str>,
 ) -> Result<Vec<Record>, WGAError> {
     // target:ACG-TTTGATGCTAGCT---ACG
     // query :ACCATTT--TGCTAACTGGGACG
+
+    match query_name {
+        Some(qname) => mafrec.set_query_idx_byname(qname)?,
+        None => mafrec.set_query_idx(1),
+    }
 
     let mut var_recs = Vec::new();
 

@@ -148,6 +148,9 @@ pub enum Commands {
         /// Input query FASTA File, required if input is PAF
         #[arg(required = false, long, short)]
         query: Option<String>,
+        /// query name when multiple query in MAF, None for first query
+        #[arg(required = false, long)]
+        query_name: Option<String>,
     },
     /// View MAF file in terminal
     #[command(visible_alias = "tv", name = "tview")]

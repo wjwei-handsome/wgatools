@@ -79,6 +79,7 @@ fn main_entry() -> Result<(), WGAError> {
             format,
             target,
             query,
+            query_name,
         } => match format {
             FileFormat::Maf => {
                 wrap_maf_call(
@@ -89,6 +90,7 @@ fn main_entry() -> Result<(), WGAError> {
                     *svlen,
                     false,
                     sample.as_deref(),
+                    query_name.as_deref(),
                 )?;
             }
             FileFormat::Paf => {

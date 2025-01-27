@@ -78,6 +78,8 @@ pub enum WGAError {
     SLineCountNotMatch,
     #[error("Jinja2 Error: {0}, please contact the author")]
     Jinja2Error(#[from] minijinja::Error),
+    #[error("Query name:{0} not found in MAF")]
+    QueryNameNotFound(String),
     // Other error
     #[error(transparent)]
     Other(#[from] anyhow::Error),

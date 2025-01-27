@@ -69,6 +69,7 @@ fn emit_new_maf_rec(
     let mut new_rec = MAFRecord {
         score: rec.score,
         slines: vec![],
+        query_idx: 1,
     };
     for (i, sline) in rec.slines.iter().enumerate() {
         let new_seq = &sline.seq[chunk_start as usize..chunk_end as usize];
