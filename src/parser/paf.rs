@@ -3,6 +3,7 @@ use crate::parser::cigar::parse_paf_to_cigar;
 use crate::parser::common::{AlignRecord, RecStat, Strand};
 use csv::{DeserializeRecordsIter, ReaderBuilder};
 use regex::Regex;
+use rust_htslib::faidx::Reader as FaReader;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io;
@@ -214,4 +215,24 @@ fn cs_to_cigar(cs_tag: &str) -> String {
     }
 
     cigar
+}
+
+impl PafRecord {
+    pub fn target_seq_with_fa(&self, fardr: &FaReader) -> Result<String, WGAError> {
+        let seq = fardr.fetch_seq_string(
+            &self.target_name,
+            self.target_start as usize,
+            self.target_end as usize,
+        )?;
+        Ok(seq)
+    }
+
+    pub fn query_seq_with_fa(&self, fardr: &FaReader) -> Result<String, WGAError> {
+        let seq = fardr.fetch_seq_string(
+            &self.query_name,
+            self.query_start as usize,
+            self.query_end as usize,
+        )?;
+        Ok(seq)
+    }
 }

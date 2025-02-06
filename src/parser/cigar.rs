@@ -30,17 +30,17 @@ pub struct Cigar {
 
 /// CigarUnit is a atom operation in cigar string
 #[derive(Debug)]
-struct CigarUnit {
-    op: char, // M, I, D, N, S, H, P, =, X operations
-    len: u64, // length of the operation
+pub struct CigarUnit {
+    pub op: char, // M, I, D, N, S, H, P, =, X operations
+    pub len: u64, // length of the operation
 }
 
-struct CigarStrTuple<'a>(&'a str, &'a str);
+pub struct CigarStrTuple<'a>(&'a str, &'a str);
 /// Convert CigarStrTuple to CigarUnit
 /// NOTE: We have carried out seemingly cumbersome operations here,
 /// in fact, in order to better transmit errors due to
 /// nom::fold_many1, we need to return IResult for FnMut
-fn cst2cu(cst: CigarStrTuple) -> Result<CigarUnit, WGAError> {
+pub fn cst2cu(cst: CigarStrTuple) -> Result<CigarUnit, WGAError> {
     // just consume the first char of cst.0, will faster than cst.0.as_bytes()[0]
     let mut chars = cst.0.chars();
     let op = match chars.next() {
@@ -56,7 +56,7 @@ fn cst2cu(cst: CigarStrTuple) -> Result<CigarUnit, WGAError> {
 }
 
 /// Parse a cigar unit until the input is empty
-fn parse_cigar_str_tuple(input: &str) -> IResult<&str, CigarStrTuple> {
+pub fn parse_cigar_str_tuple(input: &str) -> IResult<&str, CigarStrTuple> {
     // if input is empty, return error to break infinite loop
     if input.is_empty() {
         return Err(nom::Err::Error(Error::new(

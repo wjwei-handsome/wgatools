@@ -1,11 +1,13 @@
 use crate::errors::WGAError;
-use crate::parser::cigar::{cigar_cat_ext_caller, parse_cigar_to_insert};
+use crate::parser::cigar::cst2cu;
+use crate::parser::cigar::{cigar_cat_ext_caller, parse_cigar_str_tuple};
 use crate::parser::common::{AlignRecord, Strand};
-use crate::parser::maf::{MAFReader, MAFRecord, MAFSLine};
-use crate::parser::paf::PAFReader;
+use crate::parser::maf::{MAFReader, MAFRecord};
+use crate::parser::paf::{PAFReader, PafRecord};
 use crate::tools::index::MafIndex;
-use crate::utils::reverse_complement;
 use itertools::Itertools;
+use nom::bytes::complete::tag;
+use nom::multi::fold_many1;
 use noodles::vcf;
 use noodles::vcf::{
     header::{
@@ -23,6 +25,7 @@ use noodles::vcf::{
 use rayon::iter::ParallelIterator;
 use rayon::prelude::*;
 use rust_htslib::faidx;
+use rust_htslib::faidx::Reader as FaReader;
 use std::io::{Read, Write};
 
 // A example:
@@ -93,97 +96,17 @@ pub fn call_var_paf<R: Read + Send>(
     let sample = sample.unwrap_or("sample");
     let mut header = build_header(sample)?;
 
-    // collect all PAF records
-    let pafrecords = pafreader
-        .records()
-        .par_bridge()
-        .collect::<Result<Vec<_>, _>>()?;
-
-    // get FASTA readers
+    // Process records sequentially to avoid sharing FASTA readers between threads
+    let mut within_var_recs = Vec::new();
     let t_reader = faidx::Reader::from_path(t_fa_path)?;
     let q_reader = faidx::Reader::from_path(q_fa_path)?;
 
-    // map PAF records to MAF records
-    let mut maf_records = pafrecords
-        .iter()
-        .map(|pafrec| {
-            // get target information
-            let t_name = &pafrec.target_name;
-            let t_start = pafrec.target_start;
-            let t_end = pafrec.target_end - 1;
-            let t_strand = pafrec.target_strand();
-            let t_alilen = pafrec.target_end - pafrec.target_start;
-            let t_size = pafrec.target_length;
-
-            // get query information
-            let q_name = &pafrec.query_name;
-            let q_strand = pafrec.query_strand();
-            let q_size = pafrec.query_length;
-            let q_alilen = pafrec.query_end - pafrec.query_start;
-            let q_start = match q_strand {
-                Strand::Positive => pafrec.query_start,
-                Strand::Negative => q_size - pafrec.query_end,
-            };
-
-            // get whole target and query sequence
-            let mut whole_t_seq =
-                t_reader.fetch_seq_string(t_name, t_start as usize, t_end as usize)?;
-            let mut whole_q_seq = q_reader.fetch_seq_string(
-                q_name,
-                pafrec.query_start as usize,
-                (pafrec.query_end - 1) as usize,
-            )?;
-
-            // reverse complement query sequence if it is negative strand
-            if q_strand == Strand::Negative {
-                whole_q_seq = reverse_complement(&whole_q_seq)?;
-            }
-
-            // parse CIGAR to insertions
-            parse_cigar_to_insert(pafrec, &mut whole_t_seq, &mut whole_q_seq)?;
-
-            // build MAF SLine
-            let t_sline = MAFSLine {
-                mode: 's',
-                name: t_name.to_string(),
-                start: t_start,
-                align_size: t_alilen,
-                strand: t_strand,
-                size: t_size,
-                seq: whole_t_seq,
-            };
-
-            let q_sline = MAFSLine {
-                mode: 's',
-                name: q_name.to_string(),
-                start: q_start,
-                align_size: q_alilen,
-                strand: q_strand,
-                size: q_size,
-                seq: whole_q_seq,
-            };
-
-            // build MAF record
-            Ok(MAFRecord {
-                score: pafrec.mapq,
-                slines: vec![t_sline, q_sline],
-                query_idx: 1,
-            })
-        })
-        .collect::<Result<Vec<_>, WGAError>>()?;
-
-    // lazy use, TODO refine it
-    let within_var_recs = maf_records
-        .par_iter_mut()
-        .try_fold(Vec::new, |mut acc, rec| {
-            let var_recs = call_within_var(rec, if_snp, svlen_cutoff, None)?;
-            acc.extend(var_recs);
-            Ok::<Vec<Record>, WGAError>(acc)
-        })
-        .try_reduce(Vec::new, |mut acc, mut vec| {
-            acc.append(&mut vec);
-            Ok(acc)
-        })?;
+    // Collect and process records sequentially
+    for pafrec_result in pafreader.records() {
+        let pafrec = pafrec_result?;
+        let var_recs = call_within_var_paf(&pafrec, if_snp, svlen_cutoff, &t_reader, &q_reader)?;
+        within_var_recs.extend(var_recs);
+    }
 
     // write VCF
     add_header_contig(None, &mut header)?;
@@ -504,4 +427,223 @@ fn call_within_var(
         }
     }
     Ok(var_recs)
+}
+
+fn call_within_var_paf(
+    pafrec: &PafRecord,
+    if_snp: bool,
+    svlen_cutoff: u64,
+    t_fardr: &FaReader,
+    q_fardr: &FaReader,
+) -> Result<Vec<Record>, WGAError> {
+    // init variant records
+    let mut var_recs = Vec::new();
+
+    let target_current_offset = pafrec.target_start();
+    let query_current_offset = pafrec.query_start();
+
+    let chro = pafrec.target_name();
+    let q_chro = pafrec.query_name();
+    let t_start = pafrec.target_start();
+    let t_end = pafrec.target_end();
+    let q_start = pafrec.query_start();
+    let q_end = pafrec.query_end();
+
+    let t_seq_string = pafrec.target_seq_with_fa(t_fardr)?;
+    let q_seq_string = pafrec.query_seq_with_fa(q_fardr)?;
+
+    let init_format: &str = "GT:QI\t1|1:";
+
+    // add a inversion record if MafRecord's strand is '-'
+    let strand = pafrec.query_strand();
+    let format_surfix = match strand {
+        Strand::Negative => 'N',
+        Strand::Positive => 'P',
+    };
+    if strand == Strand::Negative {
+        let ref_base = &t_seq_string[0..1];
+        let info = format!("SVTYPE=INV;END={}", t_end);
+        let queryinfo = format!(
+            "{}{}@{}@{}@{}",
+            init_format, q_chro, q_start, q_end, format_surfix
+        );
+        let record = get_variant_rec(
+            chro,
+            target_current_offset as usize + 1,
+            ref_base,
+            "<INV>",
+            // &id,
+            Some(&info),
+            Some(&queryinfo),
+        );
+        var_recs.push(record?);
+    }
+
+    let cigar_string = pafrec.get_cigar_string()?;
+
+    let (cigar, _tag) = tag("cg:Z:")(cigar_string.as_str())?;
+
+    let mut t_pos = target_current_offset;
+    let mut q_pos = query_current_offset;
+
+    let mut init_info = String::new();
+    if strand == Strand::Negative {
+        init_info.push_str("INV_NEST=TRUE;");
+    }
+    let mut after_m = false;
+
+    let (_, _) = fold_many1(parse_cigar_str_tuple, null, |res, cigarunit| {
+        if res.is_ok() {
+            // Parse CIGAR unit manually
+            let cigarunit = cst2cu(cigarunit)?;
+            let op = cigarunit.op;
+            let len = cigarunit.len;
+            match op {
+                'M' | '=' => {
+                    t_pos += len;
+                    q_pos += len;
+                    after_m = true;
+                }
+                'X' => {
+                    if if_snp {
+                        for _ in 0..len {
+                            let t_slice_start = (t_pos - t_start) as usize;
+                            let t_slice_end = t_slice_start + 1;
+
+                            let q_slice_start = (q_pos - q_start) as usize;
+                            let q_slice_end = q_slice_start + 1;
+
+                            let ref_base = &t_seq_string[t_slice_start..t_slice_end];
+                            let alt_base = &q_seq_string[q_slice_start..q_slice_end];
+
+                            let queryinfo =
+                                format!("{}{}@{}@{}", init_format, q_chro, q_pos, format_surfix);
+                            let record = get_variant_rec(
+                                chro,
+                                t_pos as usize + 1,
+                                ref_base,
+                                alt_base,
+                                None,
+                                Some(&queryinfo),
+                            );
+                            var_recs.push(record?);
+                            t_pos += 1;
+                            q_pos += 1;
+                        }
+                    } else {
+                        t_pos += len;
+                        q_pos += len;
+                    }
+                    after_m = true;
+                }
+                'I' => {
+                    if len > svlen_cutoff {
+                        // This case for:
+                        // t: ----A
+                        // q: AAAAA
+                        // This case for:
+                        // t: TTGGG---
+                        // q: TT---AAA
+                        // This case for:
+                        // t: GGG---
+                        // q: ---AAA
+                        if !after_m {
+                            q_pos += len;
+                            after_m = false;
+                            return Ok(());
+                        }
+                        let t_slice_start = (t_pos - t_start - 1) as usize;
+                        let t_slice_end = t_slice_start + 1;
+
+                        let q_slice_start = (q_pos - q_start - 1) as usize;
+                        let q_slice_end = q_slice_start + len as usize + 1;
+
+                        let info = format!("{}SVTYPE=INS;SVLEN={};END={}", init_info, len, t_pos);
+
+                        let queryinfo = format!(
+                            "{}{}@{}@{}@{}",
+                            init_format,
+                            q_chro,
+                            q_pos,
+                            q_pos + len,
+                            format_surfix
+                        );
+
+                        let ref_base = &t_seq_string[t_slice_start..t_slice_end];
+                        let alt_base = &q_seq_string[q_slice_start..q_slice_end];
+                        let record = get_variant_rec(
+                            chro,
+                            t_pos as usize,
+                            ref_base,
+                            alt_base,
+                            Some(&info),
+                            Some(&queryinfo),
+                        );
+                        var_recs.push(record?);
+                    }
+                    q_pos += len;
+                    after_m = false;
+                }
+                'D' => {
+                    if len > svlen_cutoff {
+                        // for this case:
+                        // t: AAAAA
+                        // q: ----A
+                        // for this case:
+                        // t: TT---AAAAA
+                        // q: TTGGG----A
+                        // for this case:
+                        // t: ---AAAAA
+                        // q: GGG----A
+
+                        // normal case:
+                        // t: TTAAAAA
+                        // q: TT----A
+                        if !after_m {
+                            t_pos += len;
+                            after_m = false;
+                            return Ok(());
+                        }
+
+                        let t_slice_start = (t_pos - t_start - 1) as usize;
+                        let t_slice_end = t_slice_start + len as usize + 1;
+
+                        let q_slice_start = (q_pos - q_start - 1) as usize;
+                        let q_slice_end = q_slice_start + 1;
+
+                        let info =
+                            format!("{}SVTYPE=DEL;SVLEN={};END={}", init_info, len, t_pos + len);
+
+                        let queryinfo = format!(
+                            "{}{}@{}@{}@{}",
+                            init_format, q_chro, q_pos, q_pos, format_surfix
+                        );
+
+                        let ref_base = &t_seq_string[t_slice_start..t_slice_end];
+                        let alt_base = &q_seq_string[q_slice_start..q_slice_end];
+                        let record = get_variant_rec(
+                            chro,
+                            t_pos as usize,
+                            ref_base,
+                            alt_base,
+                            Some(&info),
+                            Some(&queryinfo),
+                        );
+                        var_recs.push(record?);
+                    }
+                    t_pos += len;
+                    after_m = false;
+                }
+                _ => return Err(WGAError::CigarOpInvalid(op.to_string())),
+            }
+        }
+        res
+    })(cigar)?;
+
+    Ok(var_recs)
+}
+
+/// a phantom
+fn null() -> Result<(), WGAError> {
+    Ok(())
 }
