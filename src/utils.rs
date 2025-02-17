@@ -681,6 +681,7 @@ pub fn wrap_dotplot(
     output: &str,
     query_name: Option<String>,
     rewrite: bool,
+    color: Option<String>,
 ) -> Result<(), WGAError> {
     // prepare reader and writer
     let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
@@ -710,6 +711,7 @@ pub fn wrap_dotplot(
         no_identity,
         cutoff,
         query_name.as_deref(),
+        color.as_deref(),
     )?;
     Ok(())
 }

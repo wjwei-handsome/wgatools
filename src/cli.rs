@@ -208,6 +208,9 @@ pub enum Commands {
         /// Query name when multiple query in MAF, None for first query
         #[arg(required = false, short, long)]
         query_name: Option<String>,
+        /// Custom colors for CIGAR types in format "M:#FF0000,I:#00FF00,D:#0000FF,MR:#111111"
+        #[arg(required = false, long)]
+        color: Option<String>,
     },
     /// Filter records for Alignment file
     #[command(visible_alias = "fl", name = "filter")]

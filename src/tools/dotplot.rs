@@ -10,8 +10,33 @@ use crate::{
 use minijinja::{context, Environment};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::io::{BufRead, Read, Write};
+use serde_json::{json, Value};
+use std::{
+    collections::HashMap,
+    io::{BufRead, Read, Write},
+};
+
+fn parse_color_config(color_str: &str) -> Result<HashMap<String, String>, WGAError> {
+    let mut color_map = HashMap::new();
+    for pair in color_str.split(',') {
+        let parts: Vec<&str> = pair.split(':').collect();
+        if parts.len() != 2 {
+            return Err(WGAError::Other(anyhow::anyhow!(
+                "Invalid color format: {}. Expected format: M:#FF0000",
+                pair
+            )));
+        }
+        // Validate hex color code
+        if !parts[1].starts_with('#') || parts[1].len() != 7 {
+            return Err(WGAError::Other(anyhow::anyhow!(
+                "Invalid hex color code: {}. Expected format: #RRGGBB",
+                parts[1]
+            )));
+        }
+        color_map.insert(parts[0].to_string(), parts[1].to_string());
+    }
+    Ok(color_map)
+}
 
 const DOTPLOT_SPEC: &str = r#"
 {
@@ -174,6 +199,7 @@ pub fn dotplot(
     no_identity: bool,
     skip_cutoff: usize,
     query_name: Option<&str>,
+    color_config: Option<&str>,
 ) -> Result<(), WGAError> {
     // init vega spec
     let mut vega_spec: Value = serde_json::from_str(DOTPLOT_SPEC)?;
@@ -218,6 +244,15 @@ pub fn dotplot(
             vega_spec["encoding"]["color"]["field"] = "cigar".into();
             vega_spec["encoding"]["color"]["type"] = "nominal".into();
             vega_spec["encoding"]["tooltip"][2]["field"] = "cigar".into();
+
+            if let Some(color_str) = color_config {
+                let color_map = parse_color_config(color_str)?;
+                let domain: Vec<String> = color_map.keys().cloned().collect();
+                let range: Vec<String> = color_map.values().cloned().collect();
+
+                vega_spec["encoding"]["color"]["scale"]["domain"] = json!(domain);
+                vega_spec["encoding"]["color"]["scale"]["range"] = json!(range);
+            }
 
             render_output(final_base_plotdata, writer, out_format, vega_spec)?;
         }

@@ -141,6 +141,7 @@ fn main_entry() -> Result<(), WGAError> {
             length,
             mode,
             query_name,
+            color,
         } => {
             wrap_dotplot(
                 input,
@@ -152,6 +153,7 @@ fn main_entry() -> Result<(), WGAError> {
                 &outfile,
                 query_name.clone(),
                 rewrite,
+                color.clone(),
             )?;
         }
         Commands::Filter {
