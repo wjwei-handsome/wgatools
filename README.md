@@ -225,6 +225,7 @@ In Interactive html, you can click on the legend to view only the types of inter
 
 > [!WARNING]
 >NOTE: For better interactivity, the `zoom` function is turned on. However, if there is too much data, the effect may be limited by your browser performance.
+For Better performance, you can collapse short segments by `-l` parameter.
 
 This [simple example](https://github.com/wjwei-handsome/wgatools/blob/master/test/test.html) can be found in the [test](https://github.com/wjwei-handsome/wgatools/tree/master/test) directory.
 
@@ -239,6 +240,7 @@ wgatools dotplot test.maf -m overview > overview.html
 ```
 
 😎 For [`vega`](https://vega.github.io) and DIY hackers, we also provide output in json(vega schema) and csv formats.
+Official tool [vl-converter](https://github.com/vega/vl-convert) can convert json files to multiple formats.
 
 ### Extract regions from MAF file
 
