@@ -444,7 +444,7 @@ paf2chain --input Zm-CML333.paf > bar|16.28|0.86|16.27|3.80|12.03|15.01|17.67
 - [ ] Local improvement of alignment by re-alignment
 - [ ] MAF -> GAF -> HAL
 - [ ] output gvcf for variants
-- [ ] call variants from PAF directly
+- [X] call variants from PAF directly
 
 
 ## Contributing
