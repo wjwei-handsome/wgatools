@@ -44,6 +44,15 @@ const DOTPLOT_SPEC: &str = r#"
     }, {
         "calculate": "datum.query_chro+':'+toString(datum.query_start)+'-'+toString(datum.query_end)",
         "as": "query"
+    }, {
+        "calculate": "abs(datum.ref_end-datum.ref_start)",
+        "as": "ref_len"
+    },{
+        "calculate": "abs(datum.query_end-datum.query_start)",
+        "as": "query_len"
+    }, {
+        "as": "cigar",
+        "calculate": "datum.cigar == 'M' && datum.query_start > datum.query_end ? 'M_R' : datum.cigar"
     }],
     "encoding": {
         "x": {
@@ -84,6 +93,12 @@ const DOTPLOT_SPEC: &str = r#"
         }, {
             "field": "identity",
             "type": "nominal"
+        }, {
+            "field": "ref_len",
+            "type": "quantitative"
+        },{
+            "field": "query_len",
+            "type": "quantitative"
         }],
         "column": {
             "field": "ref_chro",
