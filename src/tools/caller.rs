@@ -2,10 +2,11 @@ use crate::errors::WGAError;
 use crate::parser::cigar::cst2cu;
 use crate::parser::cigar::{cigar_cat_ext_caller, parse_cigar_str_tuple};
 use crate::parser::common::{AlignRecord, Strand};
-use crate::parser::maf::{MAFReader, MAFRecord};
+use crate::parser::maf::{MAFReader, MAFRecord, MAFSLine};
 use crate::parser::paf::{PAFReader, PafRecord};
 use crate::tools::index::MafIndex;
 use itertools::Itertools;
+use log::info;
 use nom::bytes::complete::tag;
 use nom::multi::fold_many1;
 use noodles::vcf;
@@ -22,8 +23,6 @@ use noodles::vcf::{
     },
     Header, Record,
 };
-use rayon::iter::ParallelIterator;
-use rayon::prelude::*;
 use rust_htslib::faidx;
 use rust_htslib::faidx::Reader as FaReader;
 use std::io::{Read, Write};
@@ -48,37 +47,174 @@ pub fn call_var_maf<R: Read + Send>(
     _between: bool,
     sample: Option<&str>,
     query_name: Option<&str>,
+    chunk_size: Option<usize>,
 ) -> Result<(), WGAError> {
     let mut vcf_wtr = vcf::Writer::new(writer);
     let sample = sample.unwrap_or("sample");
     let mut header = build_header(sample)?;
-
-    let mut mafrecords = mafreader
-        .records()
-        .par_bridge()
-        .collect::<Result<Vec<_>, WGAError>>()?;
-    // if sort
-    mafrecords.sort();
-    let within_var_recs = mafrecords
-        .par_iter_mut()
-        .try_fold(Vec::new, |mut acc, rec| {
-            let var_recs = call_within_var(rec, if_snp, svlen_cutoff, query_name)?;
-            acc.extend(var_recs);
-            Ok::<Vec<Record>, WGAError>(acc)
-        })
-        .try_reduce(Vec::new, |mut acc, mut vec| {
-            acc.append(&mut vec);
-            Ok(acc)
-        })?;
-
     // add contig to header
     add_header_contig(mafindex, &mut header)?;
-
     vcf_wtr.write_header(&header)?;
-    for rec in within_var_recs {
-        vcf_wtr.write_record(&header, &rec)?;
+
+    for maf_result in mafreader.records() {
+        let maf_record = maf_result?;
+        let base_chunk_size = chunk_size.unwrap_or(1000000);
+        info!(
+            "Processing record: {} with {} chunk size ",
+            maf_record.target_name(),
+            base_chunk_size
+        );
+        let total_size = maf_record.slines[0].seq.len();
+
+        let mut chunk_start = 0;
+        let mut chunk_count = 0;
+        while chunk_start < total_size {
+            // find save chunk boundary for avoid large SVs
+            let (safe_end, next_start) = find_safe_chunk_boundary(
+                &maf_record,
+                chunk_start,
+                base_chunk_size,
+                svlen_cutoff,
+                total_size,
+            )?;
+
+            let actual_chunk_size = safe_end - chunk_start;
+            chunk_count += 1;
+            info!(
+                "Processed chunk {}: start={}, end={}, size={}, progress={:.2}%",
+                chunk_count,
+                chunk_start,
+                safe_end,
+                actual_chunk_size,
+                (safe_end as f64 / total_size as f64) * 100.0
+            );
+
+            // create a new MAFRecord for this chunk
+            let mut chunk_record = create_chunk_record(&maf_record, chunk_start, safe_end)?;
+
+            // call variants within this chunk and write to VCF
+            let var_recs = call_within_var(&mut chunk_record, if_snp, svlen_cutoff, query_name)?;
+            for rec in var_recs {
+                vcf_wtr.write_record(&header, &rec)?;
+            }
+
+            chunk_start = next_start;
+        }
+        info!(
+            "Finished processing record: {} chunks processed",
+            chunk_count
+        );
     }
+
     Ok(())
+}
+
+fn find_safe_chunk_boundary(
+    record: &MAFRecord,
+    start: usize,
+    chunk_size: usize,
+    svlen_cutoff: u64,
+    total_size: usize,
+) -> Result<(usize, usize), WGAError> {
+    let proposed_end = (start + chunk_size).min(total_size);
+    let mut current_gap_size = 0;
+    let mut in_sv = false;
+    let mut sv_start = 0;
+    let mut safe_end = proposed_end;
+
+    // check if the chunk contains a large structural variant
+    for (pos, (ref_char, query_char)) in record.target_seq()[start..proposed_end]
+        .chars()
+        .zip(record.query_seq()[start..proposed_end].chars())
+        .enumerate()
+    {
+        let abs_pos = start + pos;
+
+        // check if this is a gap
+        if ref_char == '-' || query_char == '-' {
+            if !in_sv {
+                in_sv = true;
+                sv_start = abs_pos;
+            }
+            current_gap_size += 1;
+        } else if in_sv {
+            // if the gap is large enough, we consider it a structural variant
+            if current_gap_size >= svlen_cutoff as usize {
+                // if the gap is at the beginning of the chunk, we need to scan further to find the end of the SV
+                if sv_start >= start {
+                    // keep scanning until we find a non-gap character
+                    safe_end = abs_pos;
+                }
+            }
+            in_sv = false;
+            current_gap_size = 0;
+        }
+    }
+
+    // if the chunk ends with a structural variant, we need to scan further to find the end of the SV
+    if in_sv && current_gap_size >= svlen_cutoff as usize {
+        let mut end_pos = proposed_end;
+        for (pos, (ref_char, query_char)) in record.target_seq()[proposed_end..]
+            .chars()
+            .zip(record.query_seq()[proposed_end..].chars())
+            .enumerate()
+        {
+            if ref_char != '-' && query_char != '-' {
+                end_pos = proposed_end + pos;
+                break;
+            }
+        }
+        safe_end = end_pos;
+    }
+
+    // return the safe end position and the next start position
+    Ok((safe_end, safe_end))
+}
+
+fn create_chunk_record(
+    original: &MAFRecord,
+    start: usize,
+    end: usize,
+) -> Result<MAFRecord, WGAError> {
+    let mut chunk = MAFRecord {
+        score: original.score,
+        slines: Vec::with_capacity(original.slines.len()),
+        query_idx: original.query_idx,
+    };
+
+    for sline in &original.slines {
+        let seq = &sline.seq[start..end];
+
+        // get the new start position and alignment size
+        let mut new_start = sline.start;
+        let mut new_align_size = 0;
+
+        // cal the bases
+        for c in sline.seq[..start].chars() {
+            if c != '-' {
+                new_start += 1;
+            }
+        }
+
+        // cal the alignment size
+        for c in seq.chars() {
+            if c != '-' {
+                new_align_size += 1;
+            }
+        }
+
+        chunk.slines.push(MAFSLine {
+            mode: sline.mode,
+            name: sline.name.clone(),
+            start: new_start,
+            align_size: new_align_size,
+            strand: sline.strand,
+            size: sline.size,
+            seq: seq.to_string(),
+        });
+    }
+
+    Ok(chunk)
 }
 
 #[allow(clippy::too_many_arguments)]

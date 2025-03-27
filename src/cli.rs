@@ -157,6 +157,9 @@ pub enum Commands {
         /// query name when multiple query in MAF, None for first query
         #[arg(required = false, long)]
         query_name: Option<String>,
+        /// Chunk size for MAF Caller
+        #[arg(required = false, long, short, default_value = "1000000")]
+        chunk_size: Option<usize>,
     },
     /// View MAF file in terminal
     #[command(visible_alias = "tv", name = "tview")]

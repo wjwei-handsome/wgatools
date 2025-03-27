@@ -403,6 +403,7 @@ pub fn wrap_maf_call(
     between: bool,
     sample: Option<&str>,
     query_name: Option<&str>,
+    chunk_size: Option<usize>,
 ) -> Result<(), WGAError> {
     // prepare reader and writer
     let (reader, mut writer) = prepare_rdr_wtr(input, output, rewrite)?;
@@ -442,6 +443,7 @@ pub fn wrap_maf_call(
         between,
         sample,
         query_name,
+        chunk_size,
     )?;
     Ok(())
 }
