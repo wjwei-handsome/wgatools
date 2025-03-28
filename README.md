@@ -44,7 +44,29 @@
 
 If you use `wgatools` in your research, please cite:
 
-[Wei W, Gui S, Yang J, Garrison E, Yan J, Liu HJ. wgatools: an ultrafast toolkit for manipulating whole genome alignments. Published online September 13, 2024. doi:10.48550/arXiv.2409.08569](https://doi.org/10.48550/arXiv.2409.08569)
+[Wenjie Wei, Songtao Gui, Jian Yang, Erik Garrison, Jianbing Yan, Hai-Jun Liu, Wgatools: an ultrafast toolkit for manipulating whole genome alignments, Bioinformatics, 2025;, btaf132,](https://doi.org/10.1093/bioinformatics/btaf132)
+
+<details>
+
+<summary>BibLaTeX</summary>
+
+```bibtex
+@article{weiWgatoolsUltrafastToolkit2025,
+  title = {Wgatools: An Ultrafast Toolkit for Manipulating Whole Genome Alignments},
+  shorttitle = {Wgatools},
+  author = {Wei, Wenjie and Gui, Songtao and Yang, Jian and Garrison, Erik and Yan, Jianbing and Liu, Hai-Jun},
+  date = {2025-03-27},
+  journaltitle = {Bioinformatics},
+  shortjournal = {Bioinformatics},
+  pages = {btaf132},
+  issn = {1367-4811},
+  doi = {10.1093/bioinformatics/btaf132},
+  url = {https://doi.org/10.1093/bioinformatics/btaf132},
+  urldate = {2025-03-28},
+}
+```
+
+</details>
 
 ## Install
 
