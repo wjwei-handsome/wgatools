@@ -429,7 +429,7 @@ impl AlignRecord for ChainRecord {
 
     fn convert2paf(&mut self, _query_name: Option<&str>) -> Result<PafRecord, WGAError> {
         let cigar = parse_chain_to_cigar(self, false);
-        let cigar_string = cigar.cigar_string;
+        let cigar_string = String::from("cg:Z:") + &cigar.cigar_string;
         let block_length =
             (cigar.match_count + cigar.mismatch_count + cigar.del_count + cigar.inv_del_count)
                 as u64;
