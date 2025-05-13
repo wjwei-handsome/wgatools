@@ -73,28 +73,48 @@ pub struct MAFSLine {
 
 // impl mut for MAFSLine
 impl MAFSLine {
+    ///        A--TCCGA
+    /// region:1  23456
+    /// colidx:01234567
+    /// this function will return the col index of the region pos
     fn get_col_coord(&self, pos: u64) -> u64 {
-        let mut col_coord = 0;
-        let mut flag = 0;
-        // skip '-'
+        let mut region_pos = 0;
+
         for (i, c) in self.seq.chars().enumerate() {
-            if c == '-' {
-                continue;
-            } else {
-                flag += 1;
-                if flag == pos + 1 {
-                    col_coord = i as u64;
-                    break;
+            if c != '-' {
+                // if find the pos, return the col index
+                if region_pos == pos {
+                    return i as u64;
                 }
+                region_pos += 1;
             }
         }
-        if col_coord == 0 {
-            // if col_coord is 0, it means pos is the last position
-            col_coord = self.seq.len() as u64;
-        }
-
-        col_coord
+        // if not find the pos, return the col index of the last char
+        self.seq.len() as u64
     }
+
+    // fn get_col_coord(&self, pos: u64) -> u64 {
+    //     let mut col_coord = 0;
+    //     let mut flag = 0;
+    //     // skip '-'
+    //     for (i, c) in self.seq.chars().enumerate() {
+    //         if c == '-' {
+    //             continue;
+    //         } else {
+    //             flag += 1;
+    //             if flag == pos + 1 {
+    //                 col_coord = i as u64;
+    //                 break;
+    //             }
+    //         }
+    //     }
+    //     if col_coord == 0 {
+    //         // if col_coord is 0, it means pos is the last position
+    //         col_coord = self.seq.len() as u64;
+    //     }
+
+    //     col_coord
+    // }
 
     pub fn set_start(&mut self, start: u64) {
         self.start = start;
@@ -210,10 +230,6 @@ impl MAFRecord {
 
         let start_coord = sline.get_col_coord(cut_start_index);
         let end_coord = sline.get_col_coord(cut_end_index);
-        println!("cut_start_index: {cut_start_index}");
-        println!("start_coord: {start_coord}");
-        println!("cut_end_index: {cut_end_index}");
-        println!("end_coord: {end_coord}");
         sline.seq = sline.seq[start_coord as usize..end_coord as usize].to_string();
 
         let mut sline_idx_vec = (0..self.slines.len()).collect::<Vec<usize>>();
