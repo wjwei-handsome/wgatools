@@ -88,6 +88,10 @@ impl MAFSLine {
                 }
             }
         }
+        if col_coord == 0 {
+            // if col_coord is 0, it means pos is the last position
+            col_coord = self.seq.len() as u64;
+        }
 
         col_coord
     }
@@ -206,6 +210,10 @@ impl MAFRecord {
 
         let start_coord = sline.get_col_coord(cut_start_index);
         let end_coord = sline.get_col_coord(cut_end_index);
+        println!("cut_start_index: {cut_start_index}");
+        println!("start_coord: {start_coord}");
+        println!("cut_end_index: {cut_end_index}");
+        println!("end_coord: {end_coord}");
         sline.seq = sline.seq[start_coord as usize..end_coord as usize].to_string();
 
         let mut sline_idx_vec = (0..self.slines.len()).collect::<Vec<usize>>();
