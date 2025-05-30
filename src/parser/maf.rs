@@ -73,10 +73,10 @@ pub struct MAFSLine {
 
 // impl mut for MAFSLine
 impl MAFSLine {
-    ///        A--TCCGA
-    /// region:1  23456
-    /// colidx:01234567
-    /// this function will return the col index of the region pos
+    //        A--TCCGA
+    // region:1  23456
+    // colidx:01234567
+    // this function will return the col index of the region pos
     fn get_col_coord(&self, pos: u64) -> u64 {
         let mut region_pos = 0;
 

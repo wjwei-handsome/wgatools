@@ -10,7 +10,7 @@
 
 ## Table of Contents
 
-- [Ciation](#citation)
+- [Citation](#citation)
 - [Install](#install)
   - [Conda](#conda)
   - [Build from source](#build-from-source)
