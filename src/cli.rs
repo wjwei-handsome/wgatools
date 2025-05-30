@@ -143,6 +143,9 @@ pub enum Commands {
         /// If call SNP
         #[arg(required = false, long = "snp", short = 's', default_value = "false")]
         snp: bool,
+        /// If call Inversion
+        #[arg(required = false, long = "inv", short = 'i', default_value = "false")]
+        inv: bool,
         /// SV length cutoff
         #[arg(required = false, long = "svlen", short = 'l', default_value = "50")]
         svlen: u64,
