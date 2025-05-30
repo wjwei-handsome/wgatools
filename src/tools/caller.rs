@@ -43,6 +43,7 @@ pub fn call_var_maf<R: Read + Send>(
     mafindex: Option<MafIndex>,
     writer: &mut dyn Write,
     if_snp: bool,
+    if_inv: bool,
     svlen_cutoff: u64,
     _between: bool,
     sample: Option<&str>,
@@ -57,7 +58,35 @@ pub fn call_var_maf<R: Read + Send>(
     vcf_wtr.write_header(&header)?;
 
     for maf_result in mafreader.records() {
-        let maf_record = maf_result?;
+        let mut maf_record = maf_result?;
+        if maf_record.slines.len() == 1 {
+            // if the MAFRecord has only one SLine, we can safely return the proposed end
+            // return Err(WGAError::Other(anyhow::anyhow!(
+            //     "MAFRecord has only one SLine, cannot find safe chunk boundary"
+            // )));
+            info!(
+                "MAFRecord has only one S-line, skipping record: {}",
+                maf_record.target_name()
+            );
+            continue;
+        }
+        match query_name {
+            // Some(qname) => mafrec.set_query_idx_byname(qname)?,
+            Some(qname) => {
+                match maf_record.set_query_idx_byname(qname) {
+                    Ok(_) => {}
+                    Err(_e) => {
+                        // skip this record if query name not found
+                        info!(
+                            "Query name '{}' not found in MAF record, skipping this chunk.",
+                            qname
+                        );
+                        continue;
+                    }
+                }
+            }
+            None => maf_record.set_query_idx(1),
+        }
         let base_chunk_size = chunk_size.unwrap_or(1000000);
         info!(
             "Processing record: {} with {} chunk size ",
@@ -91,9 +120,8 @@ pub fn call_var_maf<R: Read + Send>(
 
             // create a new MAFRecord for this chunk
             let mut chunk_record = create_chunk_record(&maf_record, chunk_start, safe_end)?;
-
             // call variants within this chunk and write to VCF
-            let var_recs = call_within_var(&mut chunk_record, if_snp, svlen_cutoff, query_name)?;
+            let var_recs = call_within_var(&mut chunk_record, if_snp, svlen_cutoff, if_inv)?;
             for rec in var_recs {
                 vcf_wtr.write_record(&header, &rec)?;
             }
@@ -342,15 +370,10 @@ fn call_within_var(
     mafrec: &mut MAFRecord,
     if_snp: bool,
     svlen_cutoff: u64,
-    query_name: Option<&str>,
+    if_inv: bool,
 ) -> Result<Vec<Record>, WGAError> {
     // target:ACG-TTTGATGCTAGCT---ACG
     // query :ACCATTT--TGCTAACTGGGACG
-
-    match query_name {
-        Some(qname) => mafrec.set_query_idx_byname(qname)?,
-        None => mafrec.set_query_idx(1),
-    }
 
     let mut var_recs = Vec::new();
 
@@ -378,7 +401,7 @@ fn call_within_var(
         Strand::Negative => 'N',
         Strand::Positive => 'P',
     };
-    if strand == Strand::Negative {
+    if strand == Strand::Negative && !t_seq_ref.is_empty() && if_inv {
         let ref_base = &t_seq_ref[0..1];
         let info = format!("SVTYPE=INV;END={}", t_end);
         let queryinfo = format!(

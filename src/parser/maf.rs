@@ -503,7 +503,12 @@ impl AlignRecord for MAFRecord {
     }
 
     fn query_seq(&self) -> &str {
-        &self.slines[self.query_idx].seq
+        // &self.slines[self.query_idx].seq
+        if self.query_idx < self.slines.len() {
+            &self.slines[self.query_idx].seq
+        } else {
+            ""
+        }
     }
 
     fn target_seq(&self) -> &str {
