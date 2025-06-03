@@ -38,12 +38,7 @@ pub fn build_index(
             let end = sline.start + sline.align_size;
             let size = sline.size;
             let strand = sline.strand;
-
-            // idx.entry(name.clone()).or_insert(MafIndexItem {
-            //     ivls: Vec::new(),
-            //     size,
-            //     ord,
-            // });
+            let isref = ord == 0; // if ord is 0, it is the reference sequence
 
             if !idx.contains_key(&name) {
                 idx.insert(
@@ -51,21 +46,13 @@ pub fn build_index(
                     MafIndexItem {
                         ivls: Vec::new(),
                         size,
-                        ord,
+                        isref,
                     },
                 );
-            } else {
-                // compare ord if same
-                if idx
-                    .get(&name)
-                    .ok_or(WGAError::Other(anyhow!("not excepted")))?
-                    .ord
-                    != ord
-                {
-                    return Err(WGAError::Other(anyhow!(
-                        "There is a different order between Records!"
-                    )));
-                }
+            } else if idx.get(&name).unwrap().isref != isref {
+                return Err(WGAError::Other(anyhow!(
+                    "Same sequence cannot be both reference and query!"
+                )));
             }
 
             idx.get_mut(&name)
@@ -94,7 +81,8 @@ pub type MafIndex = HashMap<String, MafIndexItem>;
 pub struct MafIndexItem {
     pub ivls: Vec<IvP>,
     pub size: u64,
-    pub ord: usize,
+    pub isref: bool,
+    // pub ord: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

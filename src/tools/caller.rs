@@ -321,7 +321,7 @@ fn add_header_contig(mafindex: Option<MafIndex>, header: &mut Header) -> anyhow:
     if let Some(mafindex) = mafindex {
         let mut contig_vec: Vec<(String, u64)> = Vec::new();
         for (name, item) in mafindex {
-            if item.ord == 0 {
+            if item.isref {
                 let size = item.size;
                 contig_vec.push((name, size));
             }

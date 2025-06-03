@@ -159,9 +159,7 @@ fn extract_sub_blocks_with_idx<R: Read + Send + Seek, W: Write>(
                 let hit_givls = hit_ivps.iter().map(ivp2iv).collect::<Vec<Iv>>();
                 let lapper = Lapper::new(hit_givls);
                 let find = lapper.find(givl.start, givl.end).collect::<Vec<&Iv>>();
-                let find_num = find.len();
-                let ord = item.ord;
-                match find_num {
+                match find.len() {
                     0 => {
                         failed_regions.push(givl);
                         continue;
@@ -172,6 +170,11 @@ fn extract_sub_blocks_with_idx<R: Read + Send + Seek, W: Write>(
                             mafreader.inner.seek(std::io::SeekFrom::Start(offset))?;
                             let mut mafrec =
                                 mafreader.records().next().ok_or(WGAError::EmptyRecord)??;
+
+                            let ord = match mafrec.get_query_idx_byname(&givl.name) {
+                                Some(idx) => idx,
+                                None => continue,
+                            };
 
                             let b_start = block.start;
                             let b_end = block.stop;
