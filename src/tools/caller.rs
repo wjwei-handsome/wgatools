@@ -23,6 +23,7 @@ use noodles::vcf::{
     },
     Header, Record,
 };
+use regex::Regex;
 use rust_htslib::faidx;
 use rust_htslib::faidx::Reader as FaReader;
 use std::io::{Read, Write};
@@ -47,7 +48,7 @@ pub fn call_var_maf<R: Read + Send>(
     svlen_cutoff: u64,
     _between: bool,
     sample: Option<&str>,
-    query_name: Option<&str>,
+    query_regex: &Option<Regex>,
     chunk_size: Option<usize>,
 ) -> Result<(), WGAError> {
     let mut vcf_wtr = vcf::Writer::new(writer);
@@ -70,16 +71,16 @@ pub fn call_var_maf<R: Read + Send>(
             );
             continue;
         }
-        match query_name {
-            // Some(qname) => mafrec.set_query_idx_byname(qname)?,
-            Some(qname) => {
-                match maf_record.set_query_idx_byname(qname) {
+        match query_regex {
+            // Some(qname) => mafrec.set_query_idx_by_name(qname)?,
+            Some(qregex) => {
+                match maf_record.set_query_idx_by_regex(qregex) {
                     Ok(_) => {}
                     Err(_e) => {
                         // skip this record if query name not found
                         info!(
                             "Query name '{}' not found in MAF record, skipping this chunk.",
-                            qname
+                            qregex.to_string()
                         );
                         continue;
                     }
