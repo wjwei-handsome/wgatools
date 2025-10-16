@@ -5,6 +5,7 @@ use crate::parser::paf::PafRecord;
 use crate::utils::parse_str2u64;
 use anyhow::anyhow;
 use log::warn;
+use regex::Regex;
 use std::cmp::Ordering;
 use std::fs::File;
 use std::io::Write;
@@ -263,6 +264,12 @@ impl MAFRecord {
         self.slines.iter().position(|x| x.name == query_name)
     }
 
+    pub fn get_query_idx_by_regex(&self, query_regex: &Regex) -> Option<usize> {
+        self.slines
+            .iter()
+            .position(|x| query_regex.is_match(&x.name))
+    }
+
     pub fn set_query_idx(&mut self, query_idx: usize) {
         self.query_idx = query_idx;
     }
@@ -274,6 +281,16 @@ impl MAFRecord {
                 Ok(())
             }
             None => Err(WGAError::QueryNameNotFound(query_name.to_string())),
+        }
+    }
+
+    pub fn set_query_idx_by_regex(&mut self, query_regex: &Regex) -> Result<(), WGAError> {
+        match self.get_query_idx_by_regex(query_regex) {
+            Some(idx) => {
+                self.query_idx = idx;
+                Ok(())
+            }
+            None => Err(WGAError::QueryNameNotFound(query_regex.to_string())),
         }
     }
 

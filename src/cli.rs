@@ -2,6 +2,7 @@ use crate::parser::common::{DotplotMode, DotplotoutFormat, FileFormat};
 use clap::ArgAction;
 use clap::{command, Parser, Subcommand};
 use clap_complete::Shell;
+use regex::Regex;
 
 #[derive(Parser)]
 #[command(name = "wgatools")]
@@ -157,9 +158,10 @@ pub enum Commands {
         /// Input query FASTA File, required if input is PAF
         #[arg(required = false, long, short)]
         query: Option<String>,
-        /// query name when multiple query in MAF, None for first query
-        #[arg(required = false, long)]
-        query_name: Option<String>,
+        /// Query name regex when multiple query in MAF, None for first query
+        /// If multiple query names in a block match, the first will be used
+        #[arg(required = false, long, visible_alias = "query-name")]
+        query_regex: Option<Regex>,
         /// Chunk size for MAF Caller
         #[arg(required = false, long, short, default_value = "1000000")]
         chunk_size: Option<usize>,
