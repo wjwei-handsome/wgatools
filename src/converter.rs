@@ -65,7 +65,7 @@ pub fn maf2chain<R: Read + Send>(
 
         match query_name {
             Some(qname) => {
-                record.set_query_idx_byname(qname)?;
+                record.set_query_idx_by_name(qname)?;
             }
             None => {
                 // do nothing

@@ -259,7 +259,7 @@ impl MAFRecord {
         Ok(())
     }
 
-    pub fn get_query_idx_byname(&self, query_name: &str) -> Option<usize> {
+    pub fn get_query_idx_by_name(&self, query_name: &str) -> Option<usize> {
         self.slines.iter().position(|x| x.name == query_name)
     }
 
@@ -267,8 +267,8 @@ impl MAFRecord {
         self.query_idx = query_idx;
     }
 
-    pub fn set_query_idx_byname(&mut self, query_name: &str) -> Result<(), WGAError> {
-        match self.get_query_idx_byname(query_name) {
+    pub fn set_query_idx_by_name(&mut self, query_name: &str) -> Result<(), WGAError> {
+        match self.get_query_idx_by_name(query_name) {
             Some(idx) => {
                 self.query_idx = idx;
                 Ok(())
@@ -467,7 +467,7 @@ impl AlignRecord for MAFRecord {
     fn convert2paf(&mut self, query_name: Option<&str>) -> Result<PafRecord, WGAError> {
         match query_name {
             Some(qname) => {
-                self.set_query_idx_byname(qname)?;
+                self.set_query_idx_by_name(qname)?;
             }
             None => {
                 // do nothing

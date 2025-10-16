@@ -171,7 +171,7 @@ fn extract_sub_blocks_with_idx<R: Read + Send + Seek, W: Write>(
                             let mut mafrec =
                                 mafreader.records().next().ok_or(WGAError::EmptyRecord)??;
 
-                            let ord = match mafrec.get_query_idx_byname(&givl.name) {
+                            let ord = match mafrec.get_query_idx_by_name(&givl.name) {
                                 Some(idx) => idx,
                                 None => continue,
                             };

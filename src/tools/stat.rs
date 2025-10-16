@@ -70,7 +70,7 @@ pub fn stat_maf<R: Read + Send>(
         .try_fold(Vec::new, |mut acc, result_rec| {
             let mut rec = result_rec?;
             if let Some(qname) = query_name {
-                rec.set_query_idx_byname(qname)?;
+                rec.set_query_idx_by_name(qname)?;
             }
             acc.push(stat_rec(&rec)?);
             Ok::<Vec<PairStat>, WGAError>(acc)
