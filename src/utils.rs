@@ -404,7 +404,8 @@ pub fn wrap_maf_call(
     svlen: u64,
     between: bool,
     sample: Option<&str>,
-    query_regex: &Option<Regex>,
+    query_name: Option<&str>,
+    query_regex: Option<&Regex>,
     chunk_size: Option<usize>,
 ) -> Result<(), WGAError> {
     // prepare reader and writer
@@ -445,6 +446,7 @@ pub fn wrap_maf_call(
         svlen,
         between,
         sample,
+        query_name,
         query_regex,
         chunk_size,
     )?;

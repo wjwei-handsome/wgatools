@@ -158,12 +158,15 @@ pub enum Commands {
         /// Input query FASTA File, required if input is PAF
         #[arg(required = false, long, short)]
         query: Option<String>,
+        /// query name when multiple query in MAF, None for first query
+        #[arg(required = false, long)]
+        query_name: Option<String>,
         /// Query name regex when multiple query in MAF, None for first query
         /// If multiple query names in a block match, the first will be used
         /// The --query-regex must match the entire query name in the MAF in order to be considered a
         /// match.
-        /// example: --query-regex "^hg002#*"
-        #[arg(required = false, long, visible_alias = "query-name", value_parser = wrap_regex_to_full_match)]
+        /// example: --query-regex "^hg002#.*"
+        #[arg(required = false, long, value_parser = wrap_regex_to_full_match)]
         query_regex: Option<Regex>,
         /// Chunk size for MAF Caller
         #[arg(required = false, long, short, default_value = "1000000")]

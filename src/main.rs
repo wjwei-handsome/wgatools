@@ -80,6 +80,7 @@ fn main_entry() -> Result<(), WGAError> {
             format,
             target,
             query,
+            query_name,
             query_regex,
             chunk_size,
         } => match format {
@@ -93,7 +94,8 @@ fn main_entry() -> Result<(), WGAError> {
                     *svlen,
                     false,
                     sample.as_deref(),
-                    query_regex,
+                    query_name.as_deref(),
+                    query_regex.as_ref(),
                     *chunk_size,
                 )?;
             }

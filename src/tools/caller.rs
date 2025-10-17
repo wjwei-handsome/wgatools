@@ -48,7 +48,8 @@ pub fn call_var_maf<R: Read + Send>(
     svlen_cutoff: u64,
     _between: bool,
     sample: Option<&str>,
-    query_regex: &Option<Regex>,
+    query_name: Option<&str>,
+    query_regex: Option<&Regex>,
     chunk_size: Option<usize>,
 ) -> Result<(), WGAError> {
     let mut vcf_wtr = vcf::Writer::new(writer);
@@ -71,22 +72,39 @@ pub fn call_var_maf<R: Read + Send>(
             );
             continue;
         }
-        match query_regex {
-            // Some(qname) => mafrec.set_query_idx_by_name(qname)?,
-            Some(qregex) => {
-                match maf_record.set_query_idx_by_regex(qregex) {
+
+        // Use regex only if query_name not provided
+        match query_name {
+            Some(qname) => {
+                match maf_record.set_query_idx_byname(qname) {
                     Ok(_) => {}
                     Err(_e) => {
                         // skip this record if query name not found
                         info!(
                             "Query name '{}' not found in MAF record, skipping this chunk.",
-                            qregex.to_string()
+                            qname
                         );
                         continue;
                     }
                 }
             }
-            None => maf_record.set_query_idx(1),
+            None => match query_regex {
+                // Some(qname) => mafrec.set_query_idx_by_name(qname)?,
+                Some(qregex) => {
+                    match maf_record.set_query_idx_by_regex(qregex) {
+                        Ok(_) => {}
+                        Err(_e) => {
+                            // skip this record if query regex does not match
+                            info!(
+                                "Query regex '{}' does not match any query in MAF record, skipping this chunk.",
+                                qregex.to_string()
+                            );
+                            continue;
+                        }
+                    }
+                }
+                None => maf_record.set_query_idx(1),
+            },
         }
         let base_chunk_size = chunk_size.unwrap_or(1000000);
         info!(
