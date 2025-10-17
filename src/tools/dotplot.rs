@@ -304,7 +304,7 @@ fn generate_maf_data<R: Read + Send>(
         .try_fold(Vec::new, |mut acc, rec| {
             let mut rec = rec?;
             if let Some(qname) = query_name {
-                rec.set_query_idx_by_name(qname)?;
+                rec.set_query_idx_byname(qname)?;
             }
             acc.push(rec_dot_data(&rec, no_identity)?);
             Ok::<Vec<AllPlotdata>, WGAError>(acc)
@@ -367,7 +367,7 @@ fn generate_maf_basedata<R: Read + Send>(
         .try_fold(Vec::new, |mut acc, rec| {
             let mut rec = rec?;
             if let Some(qname) = query_name {
-                rec.set_query_idx_by_name(qname)?;
+                rec.set_query_idx_byname(qname)?;
             }
             acc.push(parse_maf_to_base_plotdata(&rec, cutoff)?);
             Ok::<Vec<Vec<BasePlotdata>>, WGAError>(acc)
