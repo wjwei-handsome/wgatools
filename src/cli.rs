@@ -2,6 +2,7 @@ use crate::parser::common::{DotplotMode, DotplotoutFormat, FileFormat};
 use clap::ArgAction;
 use clap::{command, Parser, Subcommand};
 use clap_complete::Shell;
+use regex::Regex;
 
 #[derive(Parser)]
 #[command(name = "wgatools")]
@@ -160,6 +161,13 @@ pub enum Commands {
         /// query name when multiple query in MAF, None for first query
         #[arg(required = false, long)]
         query_name: Option<String>,
+        /// Query name regex when multiple query in MAF, None for first query
+        /// If multiple query names in a block match, the first will be used
+        /// The --query-regex must match the entire query name in the MAF in order to be considered a
+        /// match.
+        /// example: --query-regex "^hg002#.*"
+        #[arg(required = false, long, value_parser = wrap_regex_to_full_match)]
+        query_regex: Option<Regex>,
         /// Chunk size for MAF Caller
         #[arg(required = false, long, short, default_value = "1000000")]
         chunk_size: Option<usize>,
@@ -318,4 +326,18 @@ pub enum Commands {
 
 pub fn make_cli_parse() -> Cli {
     Cli::parse()
+}
+
+/// Ensure that regex starts with ^ and ends with $ in order to match full query names
+fn wrap_regex_to_full_match(s: &str) -> Result<regex::Regex, String> {
+    let mut pattern = s.to_string();
+
+    if !pattern.starts_with('^') {
+        pattern.insert(0, '^');
+    }
+    if !pattern.ends_with('$') {
+        pattern.push('$');
+    }
+
+    regex::Regex::new(&pattern).map_err(|e| e.to_string())
 }

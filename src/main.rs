@@ -81,6 +81,7 @@ fn main_entry() -> Result<(), WGAError> {
             target,
             query,
             query_name,
+            query_regex,
             chunk_size,
         } => match format {
             FileFormat::Maf => {
@@ -94,6 +95,7 @@ fn main_entry() -> Result<(), WGAError> {
                     false,
                     sample.as_deref(),
                     query_name.as_deref(),
+                    query_regex.as_ref(),
                     *chunk_size,
                 )?;
             }

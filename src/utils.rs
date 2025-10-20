@@ -25,6 +25,7 @@ use crate::{
 use clap::CommandFactory;
 use clap_complete::{generate, Shell};
 use log::{info, warn};
+use regex::Regex;
 use std::io::{stdin, stdout, BufRead, BufReader, BufWriter, Read, Stdin, Write};
 use std::path::Path;
 use std::{fs::File, path::PathBuf};
@@ -404,6 +405,7 @@ pub fn wrap_maf_call(
     between: bool,
     sample: Option<&str>,
     query_name: Option<&str>,
+    query_regex: Option<&Regex>,
     chunk_size: Option<usize>,
 ) -> Result<(), WGAError> {
     // prepare reader and writer
@@ -445,6 +447,7 @@ pub fn wrap_maf_call(
         between,
         sample,
         query_name,
+        query_regex,
         chunk_size,
     )?;
     Ok(())
