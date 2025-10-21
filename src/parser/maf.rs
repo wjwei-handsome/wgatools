@@ -36,7 +36,7 @@ where
     }
 
     /// Iterate over the records in the MAF file
-    pub fn records(&mut self) -> MAFRecords<'_, R> {
+    pub fn records<'a>(&'a mut self) -> MAFRecords<'a, R> {
         MAFRecords {
             inner: self.inner.by_ref(),
         }

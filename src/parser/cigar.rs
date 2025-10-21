@@ -56,7 +56,7 @@ pub fn cst2cu(cst: CigarStrTuple) -> Result<CigarUnit, WGAError> {
 }
 
 /// Parse a cigar unit until the input is empty
-pub fn parse_cigar_str_tuple(input: &str) -> IResult<&str, CigarStrTuple<'_>> {
+pub fn parse_cigar_str_tuple<'a>(input: &'a str) -> IResult<&'a str, CigarStrTuple<'a>> {
     // if input is empty, return error to break infinite loop
     if input.is_empty() {
         return Err(nom::Err::Error(Error::new(
