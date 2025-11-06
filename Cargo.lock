@@ -1626,7 +1626,7 @@ checksum = "ca6ad05a4870b2bf5fe995117d3728437bd27d7cd5f06f13c17443ef369775a1"
 
 [[package]]
 name = "wgatools"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "atty",
