@@ -261,6 +261,14 @@ Similar to common dotplot scripts, it will draw each align record and color it a
 wgatools dotplot test.maf -m overview > overview.html
 ```
 
+Both modes draw all chromosomes on one genome-wide plot (chromosomes in natural order, separated by dashed lines). In the HTML page you can:
+
+- **scroll** to zoom, **drag** to pan, **double-click** to reset the view, and hover a line for details;
+- pick a **Reference** / **Query** chromosome below the plot to focus on it;
+- switch **Fit view to** between whole chromosomes and the aligned region only (chosen automatically when alignments cover a small part of the genome);
+- filter by **Min length**, and by **Min identity** in overview mode;
+- save the current view as PNG/SVG from the `…` menu.
+
 😎 For [`vega`](https://vega.github.io) and DIY hackers, we also provide output in json(vega schema) and csv formats.
 Official tool [vl-converter](https://github.com/vega/vl-convert) can convert json files to multiple formats.
 
