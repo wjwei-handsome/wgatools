@@ -385,6 +385,21 @@ fn get_variant_rec(
         .build()?)
 }
 
+// Convert an alignment-order query offset to forward-strand coordinates.
+// Keep scanning offsets unchanged because they also index the allele strings.
+fn query_interval(
+    strand: Strand,
+    q_start: u64,
+    q_end: u64,
+    offset: u64,
+    length: u64,
+) -> (u64, u64) {
+    match strand {
+        Strand::Positive => (q_start + offset, q_start + offset + length),
+        Strand::Negative => (q_end - offset - length, q_end - offset),
+    }
+}
+
 fn call_within_var(
     mafrec: &mut MAFRecord,
     if_snp: bool,
@@ -488,13 +503,11 @@ fn call_within_var(
                         init_info, len, target_current_offset
                     );
 
+                    let (qi_start, qi_end) =
+                        query_interval(strand, q_start, q_end, query_current_offset - q_start, len);
                     let queryinfo = format!(
                         "{}{}@{}@{}@{}",
-                        init_format,
-                        q_chro,
-                        query_current_offset,
-                        query_current_offset + len,
-                        format_surfix
+                        init_format, q_chro, qi_start, qi_end, format_surfix
                     );
 
                     let ref_base = &t_seq_ref[t_slice_start..t_slice_end];
@@ -542,13 +555,11 @@ fn call_within_var(
 
                     let end = target_current_offset + len;
                     let info = format!("{}SVTYPE=DEL;SVLEN={};END={}", init_info, len, end);
+                    let (qi_start, qi_end) =
+                        query_interval(strand, q_start, q_end, query_current_offset - q_start, 0);
                     let queryinfo = format!(
                         "{}{}@{}@{}@{}",
-                        init_format,
-                        q_chro,
-                        query_current_offset,
-                        query_current_offset,
-                        format_surfix
+                        init_format, q_chro, qi_start, qi_end, format_surfix
                     );
                     // let id = format!("DEL{}", del_count);
                     let ref_base = &t_seq_ref[t_slice_start..t_slice_end];
@@ -579,10 +590,15 @@ fn call_within_var(
                         let ref_base = &t_seq_ref[t_slice_start..t_slice_end];
                         let alt_base = &q_seq_ref[q_slice_start..q_slice_end];
 
-                        let queryinfo = format!(
-                            "{}{}@{}@{}",
-                            init_format, q_chro, query_current_offset, format_surfix
+                        let (qi_start, _) = query_interval(
+                            strand,
+                            q_start,
+                            q_end,
+                            query_current_offset - q_start,
+                            1,
                         );
+                        let queryinfo =
+                            format!("{}{}@{}@{}", init_format, q_chro, qi_start, format_surfix);
                         let record = get_variant_rec(
                             chro,
                             target_current_offset as usize + 1,
@@ -694,8 +710,10 @@ fn call_within_var_paf(
                             let ref_base = &t_seq_string[t_slice_start..t_slice_end];
                             let alt_base = &q_seq_string[q_slice_start..q_slice_end];
 
+                            let (qi_start, _) =
+                                query_interval(strand, q_start, q_end, q_pos - q_start, 1);
                             let queryinfo =
-                                format!("{}{}@{}@{}", init_format, q_chro, q_pos, format_surfix);
+                                format!("{}{}@{}@{}", init_format, q_chro, qi_start, format_surfix);
                             let record = get_variant_rec(
                                 chro,
                                 t_pos as usize + 1,
@@ -738,13 +756,11 @@ fn call_within_var_paf(
 
                         let info = format!("{}SVTYPE=INS;SVLEN={};END={}", init_info, len, t_pos);
 
+                        let (qi_start, qi_end) =
+                            query_interval(strand, q_start, q_end, q_pos - q_start, len);
                         let queryinfo = format!(
                             "{}{}@{}@{}@{}",
-                            init_format,
-                            q_chro,
-                            q_pos,
-                            q_pos + len,
-                            format_surfix
+                            init_format, q_chro, qi_start, qi_end, format_surfix
                         );
 
                         let ref_base = &t_seq_string[t_slice_start..t_slice_end];
@@ -792,9 +808,11 @@ fn call_within_var_paf(
                         let info =
                             format!("{}SVTYPE=DEL;SVLEN={};END={}", init_info, len, t_pos + len);
 
+                        let (qi_start, qi_end) =
+                            query_interval(strand, q_start, q_end, q_pos - q_start, 0);
                         let queryinfo = format!(
                             "{}{}@{}@{}@{}",
-                            init_format, q_chro, q_pos, q_pos, format_surfix
+                            init_format, q_chro, qi_start, qi_end, format_surfix
                         );
 
                         let ref_base = &t_seq_string[t_slice_start..t_slice_end];
@@ -825,3 +843,7 @@ fn call_within_var_paf(
 fn null() -> Result<(), WGAError> {
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "caller_qi_tests.rs"]
+mod caller_qi_tests;
